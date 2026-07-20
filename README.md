@@ -2,27 +2,6 @@
 
 一个面向 Windows、支持长期断点恢复的汉字字形重建系统：**仅从 `target.ttf` 学习字体风格**，**仅从 `ref.otf` 获取汉字结构和目标字符范围**，重新生成参考字体覆盖的全部 Han 码位，并验证目标字体中的非 Han 字形和主要 OpenType 工程数据未被破坏。
 
-## 核心数据职责
-
-```text
-fonts/target.ttf  -> 只用于学习风格
-refs/ref.otf      -> 只用于提供 Han 结构和目标字符范围
-```
-
-训练采用 `target.ttf` 自重建：
-
-```text
-target 真实字形 -> target 去风格结构代理 -> 模型 -> target 真实字形真值
-```
-
-推理阶段才读取 `ref.otf`：
-
-```text
-ref Han 结构 -> target 风格模型 -> 重建后的 target 风格 Han 字形
-```
-
-系统不需要人工同形字清单、CN/非 CN 分类或跨字体配对监督。`hanzistyleforge/contract.py` 会阻止参考字体路径进入训练，也会阻止目标字体被当作生成结构来源。
-
 ## 主要功能
 
 - 重建 `ref.otf` 默认 Unicode `cmap` 中的全部 Han 码位。
@@ -62,50 +41,51 @@ Python 3.10-3.14 64 位
    C:\FontWork\HanziStyleForge-Fusion
    ```
 
-2. 放入需要学习风格的 target 字体和字形参考 ref 字体。ref 建议使用思源黑体静态版的 Regular 字重：
+2. 放入需要学习风格的 target 字体和字形参考 ref 字体：
 
    ```text
    fonts\target.ttf
    refs\ref.otf
    ```
+   请尽量使用黑体作为 ref 字体。推荐使用静态版思源黑体 Regular，不要使用通过自动程序改造过的字体。
 
-3. 安装隔离 CUDA 环境：
+4. 安装隔离 CUDA 环境：
 
    ```text
    install_cuda130.bat
    ```
 
-4. 检查环境、字体、覆盖范围、配置和数据流契约：
+5. 检查环境、字体、覆盖范围、配置和数据流契约：
 
    ```text
    verify_project.bat
    ```
 
-5. 开始或恢复完整长期流程：
+6. 开始运行：
 
    ```text
    run_months_resilient.bat
    ```
 
-6. 只读查看状态：
+7. 查看目前状态：
 
    ```text
    run_status.bat
    ```
 
-7. 请求在下一个持久检查点安全停止：
+8. 安全暂停并保存进程：
 
    ```text
    request_safe_stop.bat
    ```
 
-   再次运行 `run_months_resilient.bat` 即可恢复；脚本会自动清除已经完成的停止请求。
-
-8. QA 报告生成后可运行：
-
+9. 继续保存的进程
+    
    ```text
-   open_qa.bat
+   run_months_resilient.bat
    ```
+
+  脚本会自动清除已经完成的停止请求。
 
 ## 正式配置
 
@@ -205,8 +185,6 @@ HanziStyleForge Fusion 是独立实现。下列公开项目和论文为架构方
 | [cjk-decomp](https://github.com/amake/cjk-decomp) | 局部残差区域的可选拆分提示 | 多许可证；本项目对内置数据选择 Apache-2.0 |
 
 详细说明见 [METHOD_REFERENCES.md](METHOD_REFERENCES.md)，第三方再分发声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
-
-参考公开方法不等于获得复制实现、数据集、字体或模型权重的许可。若后续加入任何上游材料，必须保留其版权声明并遵守当前许可证。
 
 ## 温馨提示
 
