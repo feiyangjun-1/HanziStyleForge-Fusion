@@ -1,6 +1,6 @@
 {
   "project": "HanziStyleForge Fusion",
-  "version": "2.4.1-fusion",
+  "version": "2.4.2-fusion",
   "checkpoint_format": 300,
   "license": "Apache-2.0",
   "copyright": "Copyright 2026 feiyangjun_",
@@ -10,7 +10,7 @@
     "data/cjkvi-ids/source.json"
   ],
   "file_count": 80,
-  "total_bytes": 829960,
+  "total_bytes": 835304,
   "files": [
     {
       "path": ".gitignore",
@@ -24,13 +24,13 @@
     },
     {
       "path": "CHANGELOG.md",
-      "bytes": 4367,
-      "sha256": "753155015dce087d634c79a13febf1e3684abe88d897f0ac02b983671a1548c1"
+      "bytes": 5051,
+      "sha256": "993ed0f00c0bdc4cc25ef20f0ee8842c39e687c5ea46da21143e32b3d544fb35"
     },
     {
       "path": "CITATION.cff",
       "bytes": 274,
-      "sha256": "01d5742cf3401f7c1c4c2813e17ae756a1e9e0dc0964ab625154a45cd3f9d0b2"
+      "sha256": "eedf01cfe53a76271be7709078b92c051c9119d50d4f999d275ae1d56eb0adba"
     },
     {
       "path": "CONTRIBUTING.md",
@@ -89,8 +89,8 @@
     },
     {
       "path": "TEST_REPORT.md",
-      "bytes": 4674,
-      "sha256": "48f9f8ecc3f799a88e5a97dbc3b4643b4e8153decd08b321b9ede9542ad8529e"
+      "bytes": 5356,
+      "sha256": "92ac06364299afad62fd1fc009c741a695e724ce5e17031e54e2b3ab530ff4f3"
     },
     {
       "path": "THIRD_PARTY_NOTICES.md",
@@ -98,14 +98,14 @@
       "sha256": "fa346218a98e62b12985d5f28a6fa8082d6005c21457364526c5754454acfabf"
     },
     {
-      "path": "UPGRADE_FROM_2.4.txt",
-      "bytes": 898,
-      "sha256": "c412c2caf6f17f18e027e991c5afb50676f3818b4ebf345e198936162d408134"
+      "path": "UPGRADE_FROM_2.4.1.txt",
+      "bytes": 1065,
+      "sha256": "8164cbd336d868be5e4e09724bb69b35f197bb7b26b8f69fce8c5564256f433b"
     },
     {
       "path": "VERSION.txt",
       "bytes": 79,
-      "sha256": "5d7ebdb78b756a2c13ddf1fd8fceb00ed9858feb144d4c8c72913ddd6c8a871a"
+      "sha256": "4c8edeb120c3d0d9bb65feb896aa60db51d53471016b946d934be4b7abba8cb6"
     },
     {
       "path": "build/.gitkeep",
@@ -153,9 +153,14 @@
       "sha256": "5e3d723d47b67629354d1bcaf234e599aaa73ab24f1921a575a6e253adce8eab"
     },
     {
+      "path": "hanzistyleforge.py",
+      "bytes": 164,
+      "sha256": "1347ceaf3ca80c9adf7c2bc0b09d62d828b613f55e8942295c55d3df43c4d3b3"
+    },
+    {
       "path": "hanzistyleforge/__init__.py",
       "bytes": 29,
-      "sha256": "16c6057f284224cc844937e09abbf7830f3abeab90d0bea2236396feac8319e6"
+      "sha256": "1d63d95f4610f7ff8aae09b7b9ce11194663bc0efb48f9420c82419a7fb7dbbf"
     },
     {
       "path": "hanzistyleforge/analysis.py",
@@ -249,8 +254,8 @@
     },
     {
       "path": "hanzistyleforge/fusion_training.py",
-      "bytes": 94697,
-      "sha256": "954942a0d982d17e02fd27f14cc8ea051ce0d58133bc03f2c035f2f32da06ef9"
+      "bytes": 97453,
+      "sha256": "5f1085f44dd188b0a8b08f3e2cba2dca3569e63efff51c51275227aaf4a68a74"
     },
     {
       "path": "hanzistyleforge/ids_data.py",
@@ -343,11 +348,6 @@
       "sha256": "301feb66cfd95a030963f2b50052f92790436b1389976e66b3e6becf19564cb9"
     },
     {
-      "path": "hanzistyleforge.py",
-      "bytes": 164,
-      "sha256": "1347ceaf3ca80c9adf7c2bc0b09d62d828b613f55e8942295c55d3df43c4d3b3"
-    },
-    {
       "path": "install_cuda130.bat",
       "bytes": 2902,
       "sha256": "53e60bc9a2d8e6d02d9e2c22097d57d8514a8ff2b5b30574a8012bb4db88b28e"
@@ -360,7 +360,7 @@
     {
       "path": "pyproject.toml",
       "bytes": 1357,
-      "sha256": "55dadbd9d9ed3f6a2bca043f50cce23f3cd5128bdb63c874ca82f0816d1d5cef"
+      "sha256": "e231cc30d255c49426c7f66da6544eda84ddde68e338d4c24dd713606470f03b"
     },
     {
       "path": "refs/PUT_REF_FONT_HERE.txt",
@@ -389,8 +389,8 @@
     },
     {
       "path": "selftest.py",
-      "bytes": 18592,
-      "sha256": "8e12ddfde23b428152b2152df8d2381b891d893898f3d918a7d6fe5cf22852e7"
+      "bytes": 19647,
+      "sha256": "3df985c379bce33a0a8f630aed71fd61bade65cc2feaecf5a502a34bb8871bcb"
     },
     {
       "path": "test_chars.txt",

@@ -76,6 +76,105 @@ def _scaler(device: torch.device, enabled: bool):
     return torch.amp.GradScaler("cuda", enabled=bool(enabled and device.type == "cuda"))
 
 
+def _create_vq_optimizer(
+    parameters: Iterable[torch.nn.Parameter],
+    *,
+    learning_rate: float,
+    weight_decay: float,
+    request_fused: bool,
+    device: torch.device,
+) -> tuple[torch.optim.Optimizer, bool]:
+    """Create the stable VQ AdamW optimizer.
+
+    VQ checkpoints may have been written by standard, foreach, or fused AdamW
+    implementations. PyTorch restores backend flags and moment tensors from the
+    checkpoint, and those tensors can retain a device, dtype, or memory format
+    that is incompatible with a later fused CUDA kernel. The failure appears at
+    the first optimizer step rather than while loading the checkpoint.
+
+    VQ therefore uses the deterministic single-tensor AdamW path. The major VQ
+    speedups (fast reconstruction loss, vector-quantizer EMA aggregation,
+    channels-last execution, bounded validation, and less frequent checkpoint
+    writes) remain enabled, while optimizer restore is reliable across versions.
+    """
+    del request_fused, device
+    parameter_list = list(parameters)
+    if not parameter_list:
+        raise ValueError("VQ optimizer received no trainable parameters")
+    optimizer = torch.optim.AdamW(
+        parameter_list,
+        lr=float(learning_rate),
+        betas=(0.9, 0.99),
+        weight_decay=float(weight_decay),
+        foreach=False,
+        fused=False,
+    )
+    _restore_vq_optimizer_backend(optimizer, fused=False)
+    return optimizer, False
+
+
+def _restore_vq_optimizer_backend(optimizer: torch.optim.Optimizer, *, fused: bool) -> None:
+    """Force the checkpoint-independent VQ AdamW execution path."""
+    del fused
+    for group in optimizer.param_groups:
+        group["fused"] = False
+        group["foreach"] = False
+        group["capturable"] = False
+        group["differentiable"] = False
+    # A fused optimizer instance advertises direct GradScaler support. The VQ
+    # optimizer is always constructed as standard AdamW, but removing a stale
+    # attribute makes this invariant explicit for unusually patched PyTorch
+    # builds and prevents GradScaler from forwarding fused-only arguments.
+    if hasattr(optimizer, "_step_supports_amp_scaling"):
+        try:
+            delattr(optimizer, "_step_supports_amp_scaling")
+        except (AttributeError, TypeError):
+            setattr(optimizer, "_step_supports_amp_scaling", False)
+
+
+def _prepare_vq_optimizer_state_dict(
+    state_dict: dict[str, Any],
+    *,
+    fused: bool,
+) -> dict[str, Any]:
+    """Sanitize AdamW backend flags before loading any historical checkpoint."""
+    del fused
+    prepared = copy.deepcopy(state_dict)
+    for group in prepared.get("param_groups", []):
+        group["fused"] = False
+        group["foreach"] = False
+        group["capturable"] = False
+        group["differentiable"] = False
+    return prepared
+
+
+def _repair_vq_optimizer_state_devices(optimizer: torch.optim.Optimizer) -> None:
+    """Normalize restored standard-AdamW state without requiring fused layout."""
+    for group in optimizer.param_groups:
+        for parameter in group.get("params", []):
+            state = optimizer.state.get(parameter)
+            if not state:
+                continue
+            for key, value in tuple(state.items()):
+                if not torch.is_tensor(value):
+                    continue
+                if key == "step":
+                    # Standard AdamW accepts a host-side scalar step counter.
+                    state[key] = value.detach().to(device="cpu", dtype=torch.float32)
+                    continue
+                target_dtype = parameter.dtype if value.is_floating_point() else value.dtype
+                migrated = value.detach().to(device=parameter.device, dtype=target_dtype)
+                # Moment tensors loaded from a channels-last checkpoint can have
+                # strides that differ from the current parameter. Standard AdamW
+                # does not require matching strides, but matching the parameter
+                # format avoids implicit copies and keeps future checkpoints tidy.
+                if migrated.shape == parameter.shape and migrated.layout == torch.strided:
+                    aligned = torch.empty_like(parameter, dtype=target_dtype, memory_format=torch.preserve_format)
+                    aligned.copy_(migrated)
+                    migrated = aligned
+                state[key] = migrated
+
+
 def _atomic_torch_save(payload: dict[str, Any], path: str | Path) -> None:
     final = Path(path)
     ensure_dir(final.parent)
@@ -701,18 +800,13 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
         if resume is None and previous_best is not None:
             previous = torch.load(previous_best, map_location=device, weights_only=False)
             model.load_state_dict(previous["model"], strict=True)
-        optimizer_options = {
-            "lr": float(phase["learning_rate"]),
-            "betas": (0.9, 0.99),
-            "weight_decay": float(vq_cfg.get("weight_decay", 1e-5)),
-        }
-        if bool(vq_cfg.get("fused_optimizer", True) and device.type == "cuda"):
-            optimizer_options["fused"] = True
-        try:
-            optimizer = torch.optim.AdamW(model.parameters(), **optimizer_options)
-        except (TypeError, RuntimeError):
-            optimizer_options.pop("fused", None)
-            optimizer = torch.optim.AdamW(model.parameters(), **optimizer_options)
+        optimizer, fused_optimizer = _create_vq_optimizer(
+            model.parameters(),
+            learning_rate=float(phase["learning_rate"]),
+            weight_decay=float(vq_cfg.get("weight_decay", 1e-5)),
+            request_fused=bool(vq_cfg.get("fused_optimizer", True)),
+            device=device,
+        )
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode="min", factor=0.6, patience=max(3, int(phase.get("lr_patience", 8))), min_lr=1e-6
         )
@@ -723,7 +817,14 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
         no_improvement = 0
         if resume is not None:
             model.load_state_dict(resume["model"], strict=True)
-            optimizer.load_state_dict(resume["optimizer"])
+            restored_optimizer_state = _prepare_vq_optimizer_state_dict(
+                resume["optimizer"], fused=fused_optimizer
+            )
+            optimizer.load_state_dict(restored_optimizer_state)
+            # Reapply backend flags and repair legacy state placement. Fused
+            # AdamW requires its scalar step tensors on the CUDA device.
+            _restore_vq_optimizer_backend(optimizer, fused=fused_optimizer)
+            _repair_vq_optimizer_state_devices(optimizer)
             previous_loss_profile = str(resume.get("loss_profile", "legacy_full_v1")).strip().lower()
             loss_profile_changed = previous_loss_profile != loss_profile
             if resume.get("scheduler") and not loss_profile_changed:
@@ -737,6 +838,10 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
             best = math.inf if loss_profile_changed else float(resume.get("best", math.inf))
             global_step = int(resume.get("global_step", 0))
             no_improvement = 0 if loss_profile_changed else int(resume.get("no_improvement", 0))
+        print(
+            "VQ optimizer backend: "
+            + ("fused AdamW (AMP-compatible)" if fused_optimizer else "standard AdamW")
+        )
         size = int(phase["size"])
         train_loader = _loader(
             VQGlyphDataset(index_path, split="train", size=size, augment=True),
@@ -812,6 +917,7 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
                             "scaler": scaler.state_dict(), "epoch": epoch - 1, "global_step": global_step,
                             "best": best, "no_improvement": no_improvement, "model_spec": model_spec,
                             "loss_profile": loss_profile, "channels_last": channels_last,
+                            "optimizer_backend": "fused" if fused_optimizer else "standard",
                         }, phase_dir / "in_epoch.pt")
                         guard.checkpoint_boundary()
                 count = target_aux.shape[0]
@@ -833,6 +939,7 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
                 "best": best, "no_improvement": no_improvement, "model_spec": model_spec,
                 "validation": validation, "loss_profile": loss_profile,
                 "channels_last": channels_last,
+                "optimizer_backend": "fused" if fused_optimizer else "standard",
             }
             _atomic_torch_save(payload, phase_dir / "last.pt")
             if improved:

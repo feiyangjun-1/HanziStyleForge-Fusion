@@ -12,7 +12,14 @@ from fontTools.ttLib import TTFont
 from hanzistyleforge.build_font import _map_codepoint
 from hanzistyleforge.features import expand_proxy_channels, make_target_aux, split_prediction
 from hanzistyleforge.fusion_selftest import run_fusion_selftest
-from hanzistyleforge.fusion_training import _style_plateau_state, _style_quality_gate
+from hanzistyleforge.fusion_training import (
+    _create_vq_optimizer,
+    _prepare_vq_optimizer_state_dict,
+    _repair_vq_optimizer_state_devices,
+    _restore_vq_optimizer_backend,
+    _style_plateau_state,
+    _style_quality_gate,
+)
 from hanzistyleforge.contract import DataFlowContractError, validate_data_flow_contract
 from hanzistyleforge.decomposition import (
     _token_codepoint,
@@ -394,6 +401,42 @@ def main() -> None:
     assert torch.isfinite(vq_loss)
     for key in ("sdf_loss", "skeleton_head_loss", "edge_head_loss"):
         assert key in vq_pieces and torch.isfinite(vq_pieces[key])
+
+    # Regression: historical VQ checkpoints may contain foreach/fused backend
+    # flags and moment tensors with a different memory format. Restore them into
+    # the stable single-tensor AdamW path and verify that an update succeeds.
+    legacy_model = torch.nn.Conv2d(3, 4, 3, padding=1).to(memory_format=torch.channels_last)
+    legacy_optimizer = torch.optim.AdamW(legacy_model.parameters(), foreach=True)
+    legacy_input = torch.randn(2, 3, 8, 8).to(memory_format=torch.channels_last)
+    legacy_optimizer.zero_grad(set_to_none=True)
+    legacy_model(legacy_input).square().mean().backward()
+    legacy_optimizer.step()
+    legacy_optimizer_state = legacy_optimizer.state_dict()
+    for group in legacy_optimizer_state["param_groups"]:
+        group["fused"] = True
+        group["foreach"] = True
+        group["capturable"] = True
+
+    restored_model = torch.nn.Conv2d(3, 4, 3, padding=1).to(memory_format=torch.channels_last)
+    restored_optimizer, fused_backend = _create_vq_optimizer(
+        restored_model.parameters(),
+        learning_rate=1e-3,
+        weight_decay=1e-5,
+        request_fused=True,
+        device=torch.device("cpu"),
+    )
+    assert not fused_backend
+    restored_optimizer.load_state_dict(
+        _prepare_vq_optimizer_state_dict(legacy_optimizer_state, fused=fused_backend)
+    )
+    _restore_vq_optimizer_backend(restored_optimizer, fused=fused_backend)
+    _repair_vq_optimizer_state_devices(restored_optimizer)
+    assert all(group.get("fused") is False for group in restored_optimizer.param_groups)
+    assert all(group.get("foreach") is False for group in restored_optimizer.param_groups)
+    assert not getattr(restored_optimizer, "_step_supports_amp_scaling", False)
+    restored_optimizer.zero_grad(set_to_none=True)
+    restored_model(legacy_input).square().mean().backward()
+    restored_optimizer.step()
 
     generator_ink = torch.sigmoid(ink_logits)
     refiner = GlyphRefinerFinal(base=2).eval()
