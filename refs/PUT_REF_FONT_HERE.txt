@@ -1,0 +1,3 @@
+Copy the mainland-Simplified-Chinese structural reference font into this folder and name it ref.otf.
+Recommended: official Source Han Sans Simplified Chinese / SC Regular static OTF.
+The reference may use CFF or TrueType outlines. Its Han coverage determines the Han target set.

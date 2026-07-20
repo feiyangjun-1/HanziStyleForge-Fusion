@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=75", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hanzistyleforge"
+version = "2.2.0"
+description = "Target-style-only Han glyph rebuilding with latent diffusion, local experts, codebook priors, resumable inference, and non-Han preservation."
+readme = "README.md"
+requires-python = ">=3.10,<3.15"
+license = { text = "Apache-2.0" }
+authors = [{ name = "feiyangjun_" }]
+keywords = ["font", "CJK", "Han", "glyph", "deep-learning", "TrueType", "Windows"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Environment :: Console",
+  "Intended Audience :: Developers",
+  "License :: OSI Approved :: Apache Software License",
+  "Operating System :: Microsoft :: Windows :: Windows 11",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Topic :: Multimedia :: Graphics",
+]
+dependencies = [
+  "fonttools>=4.55,<5",
+  "Pillow>=11,<13",
+  "numpy>=2,<3",
+  "opencv-contrib-python>=4.10,<5",
+  "tqdm>=4.66,<5",
+]
+
+[project.scripts]
+hanzistyleforge = "hanzistyleforge.cli:main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["hanzistyleforge*"]

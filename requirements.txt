@@ -1,0 +1,5 @@
+fonttools>=4.55,<5
+Pillow>=11,<13
+numpy>=2,<3
+opencv-contrib-python>=4.10,<5
+tqdm>=4.66,<5

@@ -1,0 +1,480 @@
+{
+  "version": 300,
+  "runtime": {
+    "prevent_system_sleep": true,
+    "thermal_guard": {
+      "enabled": true,
+      "pause_above_c": 88,
+      "resume_below_c": 80,
+      "poll_seconds": 30
+    },
+    "minimum_free_disk_gb": 45,
+    "safe_stop_file": "STOP_AFTER_CHECKPOINT"
+  },
+  "paths": {
+    "target_font": "fonts/target.ttf",
+    "reference_font": "refs/ref.otf",
+    "work_dir": "work_hanzistyleforge_fusion_fast",
+    "output_font": "build/target-HanziStyleForge-Fusion-FAST.ttf"
+  },
+  "scope": {
+    "mode": "chars_file",
+    "include_compatibility_ideographs": true,
+    "extra_chars_file": "test_chars.txt"
+  },
+  "render": {
+    "size": 128,
+    "analysis_size": 96,
+    "proxy_skeleton_size": 96,
+    "pad": 8,
+    "antialias": 2,
+    "threshold": 0.5,
+    "canonical_radius_ratio": 0.0105,
+    "distance_clip_ratio": 0.075
+  },
+  "analysis": {
+    "minimum_ink_ratio": 0.0025,
+    "maximum_ink_ratio": 0.74,
+    "maximum_border_ink": 0.015,
+    "calibration_samples": 64,
+    "panel_count": 32,
+    "maximum_style_glyphs": 128,
+    "force_reprepare": false
+  },
+  "retrieval": {
+    "enabled": true,
+    "grid": 5,
+    "window_ratio": 0.34,
+    "patches_per_glyph": 2,
+    "maximum_patches": 512,
+    "stored_patch_size": 96,
+    "descriptor_size": 10,
+    "position_weight": 1.5,
+    "minimum_activity": 0.008,
+    "knn": 3,
+    "flann_trees": 2,
+    "flann_checks": 16,
+    "distance_temperature": 0.9,
+    "strength": 0.9
+  },
+  "topology": {
+    "analysis_size": 96,
+    "prune_iterations": 1,
+    "finalists_per_family": 6,
+    "maximum_component_delta": 0,
+    "maximum_hole_delta": 0,
+    "maximum_euler_delta": 0,
+    "minimum_endpoint_tolerance": 2,
+    "minimum_junction_tolerance": 2,
+    "endpoint_tolerance_ratio": 0.16,
+    "junction_tolerance_ratio": 0.18,
+    "maximum_missing_skeleton_p90": 0.023,
+    "maximum_extra_skeleton_p90": 0.027,
+    "maximum_hole_centroid_chamfer": 0.038,
+    "maximum_zone_skeleton_distance": 0.155,
+    "maximum_topology_score": 0.06,
+    "structure_lock": true,
+    "structure_lock_core_strength": 0.95,
+    "structure_lock_radius_multiplier": 2.35
+  },
+  "loss": {
+    "weights": {
+      "bce": 0.28,
+      "dice": 0.24,
+      "edge": 0.13,
+      "multiscale": 0.08,
+      "projection": 0.075,
+      "cldice": 0.085,
+      "proxy_skeleton": 0.003,
+      "proxy_layout": 0.001,
+      "sdf": 0.16,
+      "skeleton_head": 0.1,
+      "edge_head": 0.085,
+      "topology_points": 0.003,
+      "boundary_distance": 0.04,
+      "style_signature": 0.12
+    }
+  },
+  "style_guard": {
+    "enabled": true,
+    "warmup_epochs": 16,
+    "minimum_proxy_target_gap": 0.035,
+    "minimum_style_direction": -0.03,
+    "abort_on_collapse": true,
+    "diffusion_warmup_epochs": 16,
+    "minimum_diffusion_style_direction": -0.03
+  },
+  "adversarial": {
+    "enabled": true,
+    "base_channels": 24,
+    "learning_rate": 5e-05,
+    "weight": 0.0035,
+    "feature_matching_weight": 0.3,
+    "start_epoch": 50
+  },
+  "training": {
+    "seed": 20260718,
+    "device": "cuda",
+    "amp": true,
+    "workers": 0,
+    "cpu_threads": 4,
+    "interop_threads": 1,
+    "opencv_threads": 1,
+    "validation_ratio": 0.06,
+    "base_channels": 36,
+    "weight_decay": 8e-05,
+    "gradient_clip": 0.8,
+    "ema_decay": 0.9995,
+    "preview_every": 2,
+    "checkpoint_every_steps": 150,
+    "resume_if_exists": true,
+    "reset_incompatible_checkpoints": false,
+    "balanced_sampling": true,
+    "samples_per_epoch": 0,
+    "phases": [
+      {
+        "name": "legacy_fast",
+        "size": 128,
+        "epochs": 1,
+        "batch_size": 2,
+        "gradient_accumulation": 1,
+        "learning_rate": 0.0002,
+        "minimum_learning_rate": 1e-06,
+        "early_stopping_patience": 2,
+        "adversarial": false
+      }
+    ]
+  },
+  "refiner": {
+    "enabled": true,
+    "base_channels": 28,
+    "size": 128,
+    "epochs": 1,
+    "batch_size": 1,
+    "gradient_accumulation": 1,
+    "learning_rate": 2.5e-05,
+    "early_stopping_patience": 48,
+    "ema_decay": 0.9995,
+    "samples_per_epoch": 0,
+    "adversarial": false
+  },
+  "inference": {
+    "size": 128,
+    "batch_size": 1,
+    "threshold_offsets": [
+      -0.05,
+      0.0,
+      0.05
+    ],
+    "minimum_neural_confidence": 0.78,
+    "minimum_pseudo_confidence": 0.99,
+    "maximum_border_ink": 0.015,
+    "generate_all_reference_glyphs": true,
+    "allow_reference_fallback": true,
+    "replacement_policy": "rebuild_all_reference",
+    "allow_keep_target": false,
+    "test_time_augmentation": true,
+    "candidate_weights": {
+      "neural": 1.0,
+      "retrieval": 0.985,
+      "fusion": 0.96,
+      "fallback": 1.1
+    },
+    "fusion_neural_weight": 0.64,
+    "fusion_retrieval_weight": 0.36,
+    "save_all_family_candidates": false,
+    "resume_interval": 1
+  },
+  "marathon": {
+    "enabled": true,
+    "cycles": 96,
+    "hard_samples": 10000,
+    "hard_validation_samples": 1024,
+    "hard_eval_size": 256,
+    "epochs_per_cycle": 18,
+    "initial_learning_rate": 1.6e-05,
+    "minimum_learning_rate": 5e-07,
+    "learning_rate_decay": 0.965,
+    "early_stop_cycles": 16,
+    "minimum_dice_improvement": 4e-05,
+    "snapshot_keep": 16,
+    "ensemble": {
+      "enabled": true,
+      "independent_members": 3,
+      "include_active_model": true,
+      "include_marathon_snapshots": 3,
+      "maximum_models": 7,
+      "seed_stride": 104729,
+      "use_for_inference": true
+    },
+    "refine": {
+      "enabled": false,
+      "analysis_size": 192,
+      "passes": 1,
+      "global_search_trials": 2,
+      "local_sweeps": 1,
+      "zone_grid": 3,
+      "save_every_glyphs": 1,
+      "maximum_glyphs": 0,
+      "use_component_layout": true,
+      "decomposition_file": "data/cjk-decomp.txt",
+      "component_depth": 3,
+      "maximum_component_zones": 48
+    }
+  },
+  "fusion": {
+    "enabled": true,
+    "style_dim": 64,
+    "expert_count": 4,
+    "latent_channels": 8,
+    "vq_embeddings": 64,
+    "diffusion_steps": 32,
+    "style_encoder": {
+      "size": 64,
+      "base_channels": 8,
+      "heads": 2,
+      "references_per_set": 2,
+      "inference_references": 2,
+      "style_bank_groups": 2,
+      "epochs": 1,
+      "batch_size": 2,
+      "virtual_length": 8,
+      "learning_rate": 0.00015,
+      "weight_decay": 0.0001,
+      "contrastive_margin": 0.35,
+      "lr_patience": 10,
+      "checkpoint_every_steps": 2
+    },
+    "vq": {
+      "base_channels": 8,
+      "codebook_decay": 0.995,
+      "commitment_weight": 0.24,
+      "weight_decay": 8e-05,
+      "preview_every": 1,
+      "checkpoint_every_steps": 2,
+      "loss_weights": {
+        "bce": 0.28,
+        "dice": 0.26,
+        "edge": 0.15,
+        "multiscale": 0.08,
+        "projection": 0.06,
+        "cldice": 0.06,
+        "sdf": 0.15,
+        "skeleton_head": 0.08,
+        "edge_head": 0.08
+      },
+      "phases": [
+        {
+          "name": "vq_fast",
+          "size": 128,
+          "epochs": 1,
+          "batch_size": 2,
+          "gradient_accumulation": 1,
+          "learning_rate": 0.0002,
+          "minimum_learning_rate": 1e-06,
+          "patience": 2
+        }
+      ]
+    },
+    "direct_baseline": {
+      "enabled": true,
+      "base_channels": 8,
+      "ema_decay": 0.9995,
+      "adversarial": false,
+      "phases": [
+        {
+          "name": "direct_fast",
+          "size": 128,
+          "epochs": 1,
+          "batch_size": 2,
+          "gradient_accumulation": 1,
+          "learning_rate": 0.0002,
+          "minimum_learning_rate": 1e-06,
+          "early_stopping_patience": 2,
+          "adversarial": false
+        }
+      ]
+    },
+    "diffusion": {
+      "base_channels": 12,
+      "content_base_channels": 8,
+      "time_dim": 64,
+      "schedule": "cosine",
+      "style_dropout": 0.1,
+      "ema_decay": 0.9999,
+      "weight_decay": 8e-05,
+      "noise_weight": 1.0,
+      "latent_weight": 0.2,
+      "image_weight": 0.3,
+      "style_weight": 0.18,
+      "style_loss_size": 128,
+      "min_snr_gamma": 5.0,
+      "gradient_clip": 1.0,
+      "reconstruction_timestep_limit": 16,
+      "validation_batches": 2,
+      "preview_every": 1,
+      "checkpoint_every_steps": 2,
+      "image_loss_weights": {
+        "bce": 0.24,
+        "dice": 0.24,
+        "edge": 0.14,
+        "multiscale": 0.08,
+        "projection": 0.06,
+        "cldice": 0.07,
+        "sdf": 0.16,
+        "skeleton_head": 0.09,
+        "edge_head": 0.08
+      },
+      "phases": [
+        {
+          "name": "latent_fast",
+          "size": 128,
+          "epochs": 1,
+          "batch_size": 1,
+          "gradient_accumulation": 1,
+          "learning_rate": 0.0002,
+          "minimum_learning_rate": 1e-06,
+          "patience": 2
+        }
+      ]
+    },
+    "purification": {
+      "enabled": false,
+      "cycles": 0,
+      "hard_samples": 9000,
+      "evaluation_size": 256,
+      "size": 512,
+      "epochs_per_cycle": 14,
+      "batch_size": 1,
+      "gradient_accumulation": 10,
+      "hard_repeat": 7,
+      "initial_learning_rate": 9e-06,
+      "minimum_learning_rate": 1.8e-07,
+      "learning_rate_decay": 0.96,
+      "epoch_patience": 10,
+      "minimum_improvement": 1e-05,
+      "minimum_cycle_improvement": 4e-06,
+      "early_stop_cycles": 10
+    },
+    "refiner": {
+      "enabled": true,
+      "size": 128,
+      "base_channels": 8,
+      "epochs": 1,
+      "batch_size": 1,
+      "gradient_accumulation": 1,
+      "learning_rate": 2.2e-05,
+      "ema_decay": 0.9997,
+      "style_weight": 0.2,
+      "validation_batches": 2,
+      "preview_every": 1,
+      "checkpoint_every_steps": 2,
+      "lr_patience": 10,
+      "patience": 2,
+      "loss_weights": {
+        "bce": 0.25,
+        "dice": 0.25,
+        "edge": 0.16,
+        "multiscale": 0.08,
+        "projection": 0.07,
+        "cldice": 0.08,
+        "boundary_distance": 0.05
+      }
+    },
+    "component_atlas": {
+      "enabled": true,
+      "decomposition_file": "data/cjk-decomp.txt",
+      "stored_patch_size": 32,
+      "descriptor_size": 4,
+      "maximum_patches": 512,
+      "maximum_per_component": 4,
+      "maximum_depth": 3,
+      "maximum_regions_per_glyph": 12,
+      "minimum_activity": 0.005,
+      "knn": 2,
+      "strength": 0.94,
+      "distance_temperature": 0.85
+    },
+    "contour_polisher": {
+      "enabled": true,
+      "points": 32,
+      "hidden": 32,
+      "layers": 1,
+      "heads": 2,
+      "maximum_training_contours": 512,
+      "virtual_length": 32,
+      "epochs": 1,
+      "batch_size": 4,
+      "learning_rate": 0.00012,
+      "patience": 2,
+      "build_strength": 0.56
+    },
+    "inference": {
+      "size": 128,
+      "diffusion_seeds": 1,
+      "ddim_steps": 4,
+      "ddim_eta": 0.0,
+      "guidance_scale": 1.0,
+      "snap_to_codebook": true,
+      "threshold": 0.5,
+      "threshold_offsets": [
+        -0.05,
+        0.0,
+        0.05
+      ],
+      "candidate_weights": {
+        "diffusion": 0.9,
+        "direct": 1.0,
+        "retrieval": 0.98,
+        "component": 0.94,
+        "fusion": 0.88,
+        "fallback": 1.12
+      },
+      "save_all_family_candidates": false
+    }
+  },
+  "benchmark": {
+    "enabled": true,
+    "maximum_glyphs": 1536,
+    "batch_size": 1,
+    "topology_sample_count": 1024,
+    "minimum_reconstruction_dice": 0.93,
+    "minimum_topology_pass_rate": 0.98,
+    "warn_only": true
+  },
+  "qa": {
+    "contact_sheet_count": 32
+  },
+  "build": {
+    "outline_mode": "sdf_quadratic",
+    "sdf_upsample": 2,
+    "sdf_sigma": 0.46,
+    "sdf_levels": [
+      0.0,
+      -0.06,
+      0.06,
+      -0.12,
+      0.12,
+      -0.2,
+      0.2,
+      -0.28,
+      0.28
+    ],
+    "curve_simplify": 0.48,
+    "corner_angle_degrees": 100.0,
+    "maximum_points_per_contour": 128,
+    "family_suffix": " HanziStyleForge Fusion FAST",
+    "postscript_suffix": "HanziStyleForgeFusionFAST",
+    "replace_strategy": "new_glyph_and_remap",
+    "preserve_non_han": true,
+    "verify_non_han_outlines": true,
+    "remove_han_uvs": true,
+    "disable_locl": false,
+    "require_complete": true,
+    "warn_on_bounds_anomaly": true
+  },
+  "project": {
+    "name": "HanziStyleForge Fusion",
+    "version": "2.2.0"
+  }
+}

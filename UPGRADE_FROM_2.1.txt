@@ -1,0 +1,38 @@
+HanziStyleForge Fusion 2.1 -> 2.2 upgrade
+==========================================
+
+This release does not change the model architecture or checkpoint format. The
+checkpoint format remains 300.
+
+Changes
+-------
+1. GitHub-ready README files in English, Simplified Chinese, Japanese and Korean.
+2. Copyright and package author set to feiyangjun_.
+3. Runtime and launcher messages standardized in English.
+4. Normal Windows launchers reduced to six files.
+5. The resilient launcher automatically clears a completed safe-stop request.
+6. Method references, third-party notices and font-license boundaries expanded.
+7. Production settings remain training.workers=4 and Style batch_size=8.
+
+Safe upgrade of an active project
+---------------------------------
+1. Run request_safe_stop.bat.
+2. Wait until the process exits after a durable checkpoint.
+3. Back up the project, especially:
+
+   work_hanzistyleforge_fusion_months\
+   fonts\target.ttf
+   refs\ref.otf
+
+4. Apply the 2.2 upgrade package. Its PowerShell helper preserves the folders
+   above and removes obsolete launchers and old duplicate documentation.
+5. Run verify_project.bat.
+6. Run run_months_resilient.bat to resume.
+
+Compatibility
+-------------
+- Existing compatible 2.1 checkpoints and history.csv files resume directly.
+- Style Encoder batch_size remains 8 and workers remains 4.
+- Worker count is not part of the model checkpoint.
+- No cache or trained stage needs to be deleted for this documentation/launcher
+  upgrade.

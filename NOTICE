@@ -1,0 +1,10 @@
+HanziStyleForge Fusion
+Copyright 2026 feiyangjun_
+
+This product includes CJK decomposition data from the amake/cjk-decomp project,
+used under the Apache License 2.0 option. See data/NOTICE_CJK_DECOMP.txt and
+THIRD_PARTY_NOTICES.md.
+
+No font files, pretrained model weights, or third-party research-code snapshots
+are distributed with this project. User-supplied input fonts, trained model
+weights, and generated fonts remain subject to their respective licenses.

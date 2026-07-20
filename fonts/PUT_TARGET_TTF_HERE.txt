@@ -1,0 +1,3 @@
+Copy the font to be modified into this folder and name it target.ttf.
+Required: static TrueType font with a glyf table. Variable fonts and CFF target fonts are not writable by this project.
+All valid target Han glyphs are used only to learn style. Non-Han glyphs are preserved and verified.

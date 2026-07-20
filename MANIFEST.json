@@ -1,0 +1,409 @@
+{
+  "project": "HanziStyleForge Fusion",
+  "version": "2.2.0-fusion",
+  "checkpoint_format": 300,
+  "license": "Apache-2.0",
+  "copyright": "Copyright 2026 feiyangjun_",
+  "manifest_excludes": [
+    "MANIFEST.json"
+  ],
+  "file_count": 79,
+  "total_bytes": 2213259,
+  "files": [
+    {
+      "path": ".gitignore",
+      "bytes": 438,
+      "sha256": "48de2164e9d5742a7724232d2793a259df6c4640ec9f6a0bddd7464d27ac7f93"
+    },
+    {
+      "path": "ARCHITECTURE.md",
+      "bytes": 3848,
+      "sha256": "0b5fa8cf74cd8af55131ef2259eb98dd2af47b85a60099bcc66f53ed285e0c52"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "bytes": 2302,
+      "sha256": "1e39a416b6ecd4e956527f6d3161dd9a52222884f9b6cd39a880e1c8cdbba474"
+    },
+    {
+      "path": "CITATION.cff",
+      "bytes": 274,
+      "sha256": "d77775c58ced72447bb4e95327c9a394049f17990497f1efb4be34a6b2ae608d"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "bytes": 1392,
+      "sha256": "821e8480a8c4f0fff0d6bc056270311f435bd84a94102a72c61a358880aa3bb2"
+    },
+    {
+      "path": "DATA_FLOW.md",
+      "bytes": 2178,
+      "sha256": "77c83c4f481ed1d915c6e0c9f015e05f091a564289be529d9babe68aa78cf518"
+    },
+    {
+      "path": "LICENSE",
+      "bytes": 11421,
+      "sha256": "aaa6e3b8c34bbfb915bf50416ae183e6933e51b9a164569abfa9c51eb6b09d75"
+    },
+    {
+      "path": "METHOD_REFERENCES.md",
+      "bytes": 3709,
+      "sha256": "10d67f0421450da80bfd8ee31cf707655a4e862c095472adb2a1c39dc460e509"
+    },
+    {
+      "path": "NOTICE",
+      "bytes": 463,
+      "sha256": "7930d6c5a597a5b363981a2784f706cd7adb3b775a32c1bb90c4467e2cb2137d"
+    },
+    {
+      "path": "QUICK_START.txt",
+      "bytes": 1205,
+      "sha256": "81fbbdf56c02669a6a285b95350a2cb8de72f282c1da7e0d27988dd74a271ab7"
+    },
+    {
+      "path": "README.ja.md",
+      "bytes": 12094,
+      "sha256": "c22a3c71021b89eb9d80a58e4cef676faab22cb82da1fd7c3ea9f677b87ddf90"
+    },
+    {
+      "path": "README.ko.md",
+      "bytes": 11313,
+      "sha256": "e533a804a23b69183baece863fbf80ac49d12bd1daa9eaa17797a64f6a914440"
+    },
+    {
+      "path": "README.md",
+      "bytes": 10732,
+      "sha256": "76294445b4208a27ec4c2a986e4558d460b30cc3fe4fd100d233de1e77a2144e"
+    },
+    {
+      "path": "README.zh-CN.md",
+      "bytes": 9538,
+      "sha256": "f2c0400e754953f9804c16d0f108a379f8d46e27d8204866452a2123fe354615"
+    },
+    {
+      "path": "SECURITY.md",
+      "bytes": 884,
+      "sha256": "e15781502995394ce1ff9cb5cc9d84123f78bc4c698358f6bca8bc8255cba3a4"
+    },
+    {
+      "path": "TEST_REPORT.md",
+      "bytes": 3057,
+      "sha256": "9b90447dba2ac18cd1fc09680a3e0496fca1c450dc64e30bfc9eceae66c33ab5"
+    },
+    {
+      "path": "THIRD_PARTY_NOTICES.md",
+      "bytes": 1541,
+      "sha256": "0dc03c99d398009f0a9062e7a9a9f2bce686ccd96cb60fa459c5f39deaa16071"
+    },
+    {
+      "path": "UPGRADE_FROM_2.1.txt",
+      "bytes": 1487,
+      "sha256": "6243147ac9e907a22d38f33b0f358d14003d8e268b2819982557be197027d0f1"
+    },
+    {
+      "path": "VERSION.txt",
+      "bytes": 107,
+      "sha256": "52333fe99ada34cd86d75b3113c78db61c77e8cd1920cd9f5aabb5072750ad00"
+    },
+    {
+      "path": "build/.gitkeep",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "config.json",
+      "bytes": 14637,
+      "sha256": "30be10948fb22986d0705e69529c3274ef4e336ab6aa6658f1ddee83ac966abf"
+    },
+    {
+      "path": "config_fast_test.json",
+      "bytes": 12058,
+      "sha256": "5cc8c2d13dc7f63b83df3446387c62abe8a183eec63e06ec7a318a83689969b8"
+    },
+    {
+      "path": "config_fusion_fast_test.json",
+      "bytes": 12058,
+      "sha256": "5cc8c2d13dc7f63b83df3446387c62abe8a183eec63e06ec7a318a83689969b8"
+    },
+    {
+      "path": "config_fusion_months_12gb.json",
+      "bytes": 14637,
+      "sha256": "30be10948fb22986d0705e69529c3274ef4e336ab6aa6658f1ddee83ac966abf"
+    },
+    {
+      "path": "config_months_12gb.json",
+      "bytes": 14637,
+      "sha256": "30be10948fb22986d0705e69529c3274ef4e336ab6aa6658f1ddee83ac966abf"
+    },
+    {
+      "path": "data/NOTICE_CJK_DECOMP.txt",
+      "bytes": 251,
+      "sha256": "016cec3f36f8fbd282f85961f370a1115f4590d9c66e96aea6cc0caba97d25c9"
+    },
+    {
+      "path": "data/cjk-decomp.txt",
+      "bytes": 1422452,
+      "sha256": "5accf5661dd509d4bc5966afaeb7f763231a39f23b00acda89d6c040740b8ab6"
+    },
+    {
+      "path": "fonts/PUT_TARGET_TTF_HERE.txt",
+      "bytes": 291,
+      "sha256": "5e3d723d47b67629354d1bcaf234e599aaa73ab24f1921a575a6e253adce8eab"
+    },
+    {
+      "path": "hanzistyleforge/__init__.py",
+      "bytes": 29,
+      "sha256": "ab9b14d2db5135c5b63a1aaddf980a55abc57e7efbb60f1a1214f05df6822259"
+    },
+    {
+      "path": "hanzistyleforge/analysis.py",
+      "bytes": 26081,
+      "sha256": "d025298c75e73cd720b8b84559a3c4db8fa04fcd34bbc995702681ac906dffea"
+    },
+    {
+      "path": "hanzistyleforge/benchmark.py",
+      "bytes": 12081,
+      "sha256": "cb4b082d7914f3912ca2ff82df35ea17f8088196b44e8f1ea05dc108d65b3569"
+    },
+    {
+      "path": "hanzistyleforge/build_font.py",
+      "bytes": 29316,
+      "sha256": "ca1afd37a05fe484454c557a49c387f75f5c7bcd6a88a15fa99e59cdcd53930a"
+    },
+    {
+      "path": "hanzistyleforge/charset.py",
+      "bytes": 3083,
+      "sha256": "bdecbb96bd7d3a35d6505e80801737526a7e19e1f4bd1a0fc212f3eec1716132"
+    },
+    {
+      "path": "hanzistyleforge/cli.py",
+      "bytes": 13509,
+      "sha256": "bb1b8b18ca387e735d8e7d3133fa899bb1f55a206b17f609beb89a66191234ed"
+    },
+    {
+      "path": "hanzistyleforge/component_atlas.py",
+      "bytes": 18065,
+      "sha256": "0643c8b180241f1ede8ef1466a26f4cd4247b3d31a898356451031392143b067"
+    },
+    {
+      "path": "hanzistyleforge/config.py",
+      "bytes": 21306,
+      "sha256": "d36e44bddf65636d7c6a5d351e3f01b73e2726f984eb7cf8948bb0a559d56581"
+    },
+    {
+      "path": "hanzistyleforge/contour_polish.py",
+      "bytes": 10341,
+      "sha256": "61fc46eb6ce867e37778ad970b99e3f7dc20b3e303514a6b23f355ba651a1c5e"
+    },
+    {
+      "path": "hanzistyleforge/contract.py",
+      "bytes": 4028,
+      "sha256": "29159c4843a67c8edff56ceb614712f6690a5ff91b3318fa69e0712479e67370"
+    },
+    {
+      "path": "hanzistyleforge/dataset.py",
+      "bytes": 12209,
+      "sha256": "105f190fa8d64015c3b51e670e216abed5f32d07e3d982996f7eecf667c40bfe"
+    },
+    {
+      "path": "hanzistyleforge/decomposition.py",
+      "bytes": 8668,
+      "sha256": "58ed042c29bdadc6e573b17dff06d13d14a63aab6ba45f1bed8460494009827a"
+    },
+    {
+      "path": "hanzistyleforge/ensemble.py",
+      "bytes": 6615,
+      "sha256": "79597f09d7389f68e7b6083e08094a7f1a22062eb56e52a4ad7efc68256da900"
+    },
+    {
+      "path": "hanzistyleforge/features.py",
+      "bytes": 7379,
+      "sha256": "b748bb32cd9d1536ad2b1982f578aca72f4b66f372f3eeb4927b3a854c6456c9"
+    },
+    {
+      "path": "hanzistyleforge/fusion_dataset.py",
+      "bytes": 16265,
+      "sha256": "53f43987c21e16abc715221b04f5fe037025be3bab2a19cdc916ef2514ffe7a3"
+    },
+    {
+      "path": "hanzistyleforge/fusion_diffusion.py",
+      "bytes": 8947,
+      "sha256": "30431e509e2a43132e744cd5c1ca6eda6ccaaac96cfc1c803a3946e2e0c4df5b"
+    },
+    {
+      "path": "hanzistyleforge/fusion_inference.py",
+      "bytes": 37328,
+      "sha256": "7a9702160961dbb5b00db2713b37d7faedbf5ade8f6422158c06df327e3342c2"
+    },
+    {
+      "path": "hanzistyleforge/fusion_model.py",
+      "bytes": 27230,
+      "sha256": "f9ff0862541b19bc34bb1b969f338ca2679f07f68bcaf0adb58fc974b941ff40"
+    },
+    {
+      "path": "hanzistyleforge/fusion_selftest.py",
+      "bytes": 3664,
+      "sha256": "53fffa55e19d7885011aa5962019cfd398ad06a792e4d9a4ef3cfce93a537dbe"
+    },
+    {
+      "path": "hanzistyleforge/fusion_training.py",
+      "bytes": 92403,
+      "sha256": "d7bbf8c0d68c9f43ccc58b867be68f220f305eb0d77bb4badab162af2b64364c"
+    },
+    {
+      "path": "hanzistyleforge/inference.py",
+      "bytes": 48289,
+      "sha256": "42beda7f9d3ed35c2a9577143b526cb1c9d06e24934b227422e778375d77a347"
+    },
+    {
+      "path": "hanzistyleforge/longrun.py",
+      "bytes": 3324,
+      "sha256": "a0838279ef549ee3b877cd5633fd33fcb4c55d32a5cd216c407bd0a0b13105a2"
+    },
+    {
+      "path": "hanzistyleforge/losses.py",
+      "bytes": 14142,
+      "sha256": "7355400d00c8cf69e45507fd942c0f238a7078db989be6fdb9ecd405adaadce1"
+    },
+    {
+      "path": "hanzistyleforge/marathon.py",
+      "bytes": 16217,
+      "sha256": "17f55f1c0ddefac6028b5df487b4f6b03458c7e1f0d9c66ce0a068fce6da0233"
+    },
+    {
+      "path": "hanzistyleforge/marathon_refine.py",
+      "bytes": 23500,
+      "sha256": "9083ca9c611b87e9cd0c25486de619e989c0a13bc1086a450efe5049937eb035"
+    },
+    {
+      "path": "hanzistyleforge/model.py",
+      "bytes": 14241,
+      "sha256": "8d68af4eb9e6c60d948b37c68a1e601f1d3dfc5a505f1d59f9a1e51beaac7f67"
+    },
+    {
+      "path": "hanzistyleforge/project_lock.py",
+      "bytes": 2336,
+      "sha256": "309eb0f05ee7199368cb4e341823f80234ac9fbfcce0e21b5eece3b4044e5f38"
+    },
+    {
+      "path": "hanzistyleforge/proxy.py",
+      "bytes": 26538,
+      "sha256": "f478c82234405d918ab8dd3b73b047351056b612efe9b024fa0ad49ca9817b8a"
+    },
+    {
+      "path": "hanzistyleforge/qa.py",
+      "bytes": 6961,
+      "sha256": "c81282af2abaa77932487f81313dc200492dd2b869b0bbc0723412837eb52f3d"
+    },
+    {
+      "path": "hanzistyleforge/render.py",
+      "bytes": 6950,
+      "sha256": "f2aa6b31a7d402d69f827791c0a4942bb257392feba4f80dd07ab9721b7e93f7"
+    },
+    {
+      "path": "hanzistyleforge/report.py",
+      "bytes": 5155,
+      "sha256": "d86c11642c73f8851d3a2fc0d297d138a57e8352d5751ab9cc454da9b6b9b99e"
+    },
+    {
+      "path": "hanzistyleforge/retrieval.py",
+      "bytes": 14203,
+      "sha256": "3cc79aed0cb62c50a8d58ab185bc94b563d6ee1538727e4772f82c6682748d38"
+    },
+    {
+      "path": "hanzistyleforge/runtime.py",
+      "bytes": 4408,
+      "sha256": "e40e78608c3ffa82e8daff41b04d88cc146dc6ebb858d44fe834213bad1a0105"
+    },
+    {
+      "path": "hanzistyleforge/topology.py",
+      "bytes": 16703,
+      "sha256": "1af83efeb8471cf6c1401fc6cf855734c5255fa102caafb0409844c7fc6ddc17"
+    },
+    {
+      "path": "hanzistyleforge/training.py",
+      "bytes": 37727,
+      "sha256": "6e38fea3d7c962853da35855de554979681d181df936e4dbfccc618b5ce86ee8"
+    },
+    {
+      "path": "hanzistyleforge/util.py",
+      "bytes": 8110,
+      "sha256": "313b2c360d8c4e57bf3a37fabe490080fee6ac9b5e8fcf89e94686cc8bc01986"
+    },
+    {
+      "path": "hanzistyleforge/vectorize.py",
+      "bytes": 10886,
+      "sha256": "301feb66cfd95a030963f2b50052f92790436b1389976e66b3e6becf19564cb9"
+    },
+    {
+      "path": "hanzistyleforge.py",
+      "bytes": 164,
+      "sha256": "1347ceaf3ca80c9adf7c2bc0b09d62d828b613f55e8942295c55d3df43c4d3b3"
+    },
+    {
+      "path": "install_cuda130.bat",
+      "bytes": 2902,
+      "sha256": "53e60bc9a2d8e6d02d9e2c22097d57d8514a8ff2b5b30574a8012bb4db88b28e"
+    },
+    {
+      "path": "open_qa.bat",
+      "bytes": 256,
+      "sha256": "faf156d3ca95e47c12545ac43079a85057797cc1def3974ac61266e23f5fcf1a"
+    },
+    {
+      "path": "pyproject.toml",
+      "bytes": 1357,
+      "sha256": "4f145f2d12095dd84e10486e9874cbc4684fb64ffe0cbfecbf10e97166dadcd1"
+    },
+    {
+      "path": "refs/PUT_REF_FONT_HERE.txt",
+      "bytes": 279,
+      "sha256": "58fd5ff05b4b5aa59590a230f891ed15ba46bef645c87a4441a0752cb617bab1"
+    },
+    {
+      "path": "request_safe_stop.bat",
+      "bytes": 176,
+      "sha256": "80461bbccf5f25985c599fb29bd71e6d2726fc8dc93caf49f799ce2f466a8b38"
+    },
+    {
+      "path": "requirements.txt",
+      "bytes": 91,
+      "sha256": "bfd26a5d497e649a851d9f447c04845b34e8047dc6af93d7ffcedceb4fe48cf6"
+    },
+    {
+      "path": "run_months_resilient.bat",
+      "bytes": 1742,
+      "sha256": "bab46ae7bda8a67cfa9e99cdb673078e5a3e86574d6e24983276a6b19ee06f87"
+    },
+    {
+      "path": "run_status.bat",
+      "bytes": 285,
+      "sha256": "45497f849311f71abfb09bc4dbc00ec646c632d3f5ac8884764e410efd6493aa"
+    },
+    {
+      "path": "selftest.py",
+      "bytes": 17273,
+      "sha256": "269b77c34be2b7d56f28d16c511db375756a5fae62a5847bf13d90877ae0ec7f"
+    },
+    {
+      "path": "test_chars.txt",
+      "bytes": 768,
+      "sha256": "60d75e1be84f53a2f63299c211e9f195948e5781820adb750bd3e8cf749f6eba"
+    },
+    {
+      "path": "verify_project.bat",
+      "bytes": 725,
+      "sha256": "c736404315fcd4449b1c229087a23469bfbec3e7ca04e0c84bd2f794fe13df44"
+    },
+    {
+      "path": "work_hanzistyleforge_fusion_fast/.gitkeep",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "path": "work_hanzistyleforge_fusion_months/.gitkeep",
+      "bytes": 0,
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ]
+}
