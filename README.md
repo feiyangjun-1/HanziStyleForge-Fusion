@@ -182,7 +182,7 @@ HanziStyleForge Fusion 是独立实现。下列公开项目和论文为架构方
 | [LF-Font / MX-Font 统一仓库](https://github.com/clovaai/fewshot-font-generation) | 局部部件风格、因子分解和多专家 | MIT；部分上游模块有独立来源声明 |
 | [DeepVecFont-v2](https://github.com/yizhiwang96/deepvecfont-v2) | 基于 Transformer 的矢量序列和轮廓修正 | 代码 MIT；上游字体数据集另有非商业限制 |
 | [Efficient and Scalable Chinese Vector Font Generation via Component Composition](https://arxiv.org/abs/2404.06779) | 部件区域变换和大规模组合 | 论文参考；相关代码和数据需分别检查条款 |
-| [cjk-decomp](https://github.com/amake/cjk-decomp) | 局部残差区域的可选拆分提示 | 多许可证；本项目对内置数据选择 Apache-2.0 |
+| [cjkvi/cjkvi-ids](https://github.com/cjkvi/cjkvi-ids) | 为局部残差区域提供标准 Unicode IDS 部件布局 | `ids.txt` 由程序直接从上游下载，不随项目分发；上游说明其遵循适用的 CHISE 条款 |
 
 详细说明见 [METHOD_REFERENCES.md](METHOD_REFERENCES.md)，第三方再分发声明见 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
 
