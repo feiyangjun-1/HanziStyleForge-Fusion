@@ -1,7 +1,5 @@
 # HanziStyleForge Fusion
 
-[English](README.md) | [简体中文](README.zh-CN.md) | [日本語](README.ja.md) | [한국어](README.ko.md)
-
 一个面向 Windows、支持长期断点恢复的汉字字形重建系统：**仅从 `target.ttf` 学习字体风格**，**仅从 `ref.otf` 获取汉字结构和目标字符范围**，重新生成参考字体覆盖的全部 Han 码位，并验证目标字体中的非 Han 字形和主要 OpenType 工程数据未被破坏。
 
 # 注意：本项目使用 GPL 3.0 协议。并且禁止将本项目及其生成的字体用于商业用途！
