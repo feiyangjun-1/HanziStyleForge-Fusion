@@ -55,7 +55,7 @@ Python 3.10-3.14 64 位
 - 项目包不包含字体文件或预训练权重。
 - 为避免协议冲突，请确保 target 字体与 ref 字体为同一协议。
 
-## Windows 11 快速开始
+## 使用方法
 
 1. 解压到本地短路径，例如：
 
@@ -63,7 +63,7 @@ Python 3.10-3.14 64 位
    C:\FontWork\HanziStyleForge-Fusion
    ```
 
-2. 放入字体：
+2. 放入需要学习风格的 target 字体和字形参考 ref 字体。ref 建议使用思源黑体静态版的 Regular 字重：
 
    ```text
    fonts\target.ttf
