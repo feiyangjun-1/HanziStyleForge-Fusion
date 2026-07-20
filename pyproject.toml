@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "hanzistyleforge"
-version = "2.4.0"
+version = "2.4.1"
 description = "Target-style-only Han glyph rebuilding with latent diffusion, local experts, codebook priors, resumable inference, and non-Han preservation."
 readme = "README.md"
 requires-python = ">=3.10,<3.15"

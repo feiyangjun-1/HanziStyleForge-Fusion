@@ -77,8 +77,15 @@ def _token_codepoint(token: str) -> int | None:
             return int(value[2:], 16)
         except ValueError:
             return None
-    if value.isdigit():
-        number = int(value)
+    # str.isdigit() is true for Unicode symbols such as circled digits (for
+    # example "⑦"), but int("⑦") raises ValueError.  CJKVI IDS deliberately
+    # uses these symbols as structural placeholder components, so only plain
+    # ASCII decimal text may be interpreted as a numeric codepoint.
+    if re.fullmatch(r"[0-9]+", value):
+        try:
+            number = int(value, 10)
+        except ValueError:
+            return None
         return number if number >= 0x3400 else None
     characters = [character for character in value if not _is_variation_selector(character)]
     if len(characters) == 1:

@@ -69,5 +69,15 @@ class ProjectLock:
                 import fcntl
 
                 fcntl.flock(handle.fileno(), fcntl.LOCK_UN)
+        except OSError:
+            # Closing the descriptor releases an OS lock.  Antivirus, cloud
+            # synchronization, or an already-released Windows byte-range lock
+            # can make LK_UNLCK fail with PermissionError.  Cleanup must never
+            # hide the original training exception or turn a recoverable error
+            # into a second traceback.
+            pass
         finally:
-            handle.close()
+            try:
+                handle.close()
+            except OSError:
+                pass

@@ -14,7 +14,12 @@ from hanzistyleforge.features import expand_proxy_channels, make_target_aux, spl
 from hanzistyleforge.fusion_selftest import run_fusion_selftest
 from hanzistyleforge.fusion_training import _style_plateau_state, _style_quality_gate
 from hanzistyleforge.contract import DataFlowContractError, validate_data_flow_contract
-from hanzistyleforge.decomposition import component_zones, load_decompositions, parse_ids_expression
+from hanzistyleforge.decomposition import (
+    _token_codepoint,
+    component_zones,
+    load_decompositions,
+    parse_ids_expression,
+)
 from hanzistyleforge.marathon_refine import run_marathon_refinement
 from hanzistyleforge.losses import FontLossFinal, VQReconstructionLoss
 from hanzistyleforge.inference import _emergency_fallback_row
@@ -118,17 +123,23 @@ def main() -> None:
     )
     assert "reference_raw" in fallbacks
     assert parse_ids_expression("⿱⿰日月木").serialize() == "⿱⿰日月木"
+    assert _token_codepoint("⑦") == ord("⑦")
+    assert _token_codepoint("19968") == 19968
     with tempfile.TemporaryDirectory() as ids_directory:
         ids_path = Path(ids_directory) / "ids.txt"
         ids_path.write_text(
             "# synthetic standard IDS test data\n"
             "U+660E\t明\t⿰日月\n"
-            "U+4EAE\t亮\t⿱⿳亠口冖几[G]\t⿱亠兄[TJ]\n",
+            "U+4EAE\t亮\t⿱⿳亠口冖几[G]\t⿱亠兄[TJ]\n"
+            "U+4E0D\t不\t⿱一③\n"
+            "U+537F\t卿\t⿲𠂎⑦卩[K]\n",
             encoding="utf-8",
         )
         decompositions = load_decompositions(ids_path, region_priority=["G"])
         assert 0x660E in decompositions
         assert decompositions[0x4EAE].regions == ("G",)
+        assert decompositions[0x4E0D].sequence == "⿱一③"
+        assert decompositions[0x537F].sequence == "⿲𠂎⑦卩"
         zones = component_zones(0x660E, ink, decompositions, fallback_grid=3)
         assert len(zones) >= 2 and all(zone.shape == ink.shape for zone in zones)
 
