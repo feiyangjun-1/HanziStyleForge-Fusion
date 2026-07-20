@@ -413,9 +413,15 @@ class VectorQuantizerEMA(nn.Module):
         if self.training and update:
             flat = z.permute(0, 2, 3, 1).contiguous().view(-1, self.dimension)
             flat_indices = indices.reshape(-1)
-            one_hot = F.one_hot(flat_indices, self.embeddings).type(flat.dtype)
-            counts = one_hot.sum(dim=0)
-            sums = one_hot.t() @ flat
+            # bincount + index_add is mathematically equivalent to constructing
+            # a [tokens, embeddings] one-hot matrix, but avoids a large
+            # temporary allocation for every VQ batch. Accumulate EMA statistics
+            # in float32 for stable long-running training under AMP.
+            counts = torch.bincount(flat_indices, minlength=self.embeddings).to(
+                device=self.cluster_size.device, dtype=self.cluster_size.dtype
+            )
+            sums = torch.zeros_like(self.embedding_average)
+            sums.index_add_(0, flat_indices, flat.detach().to(sums.dtype))
             self.cluster_size.mul_(self.decay).add_(counts, alpha=1.0 - self.decay)
             self.embedding_average.mul_(self.decay).add_(sums, alpha=1.0 - self.decay)
             total = self.cluster_size.sum()

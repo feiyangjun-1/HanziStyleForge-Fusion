@@ -293,11 +293,15 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "commitment_weight": 0.24,
             "weight_decay": 0.00008,
             "preview_every": 4,
-            "checkpoint_every_steps": 140,
+            "checkpoint_every_steps": 240,
+            "validation_batches": 64,
+            "loss_profile": "fast_balanced_v1",
+            "channels_last": True,
+            "fused_optimizer": True,
             "loss_weights": {
-                "bce": 0.28, "dice": 0.26, "edge": 0.15, "multiscale": 0.08,
-                "projection": 0.06, "cldice": 0.06, "sdf": 0.15,
-                "skeleton_head": 0.08, "edge_head": 0.08
+                "bce": 0.28, "dice": 0.26, "multiscale": 0.08,
+                "projection": 0.06, "sdf": 0.15,
+                "skeleton_head": 0.11, "edge_head": 0.12
             },
             "phases": [
                 {"name": "vq256", "size": 256, "epochs": 220, "batch_size": 5, "gradient_accumulation": 1, "learning_rate": 0.00018, "minimum_learning_rate": 0.000001, "patience": 48},

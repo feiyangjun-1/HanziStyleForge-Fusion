@@ -41,7 +41,7 @@ from .fusion_model import (
     StyleReferenceEncoder,
 )
 from .longrun import LongRunGuard
-from .losses import FontLossFinal, batch_binary_dice
+from .losses import FontLossFinal, VQReconstructionLoss, batch_binary_dice
 from .model import FontStyleNetFinal
 from .training import train_generator
 from .util import (
@@ -669,11 +669,20 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
     workers = int(cfg["training"].get("workers", 0))
     model_spec = _vq_spec(cfg)
     model = _vq_model(cfg).to(device)
+    channels_last = bool(vq_cfg.get("channels_last", True) and device.type == "cuda")
+    if channels_last:
+        model = model.to(memory_format=torch.channels_last)
+    loss_profile = str(vq_cfg.get("loss_profile", "fast_balanced_v1")).strip().lower()
+    if loss_profile == "legacy_full_v1":
+        criterion = FontLossFinal(vq_cfg.get("loss_weights", cfg.get("loss", {}).get("weights", {}))).to(device)
+    elif loss_profile == "fast_balanced_v1":
+        criterion = VQReconstructionLoss(vq_cfg.get("loss_weights", {})).to(device)
+    else:
+        raise ValueError(f"unsupported VQ loss_profile: {loss_profile}")
     phases = list(vq_cfg.get("phases", [])) or [{
         "name": "vq256", "size": 256, "epochs": 160, "batch_size": 4,
         "gradient_accumulation": 1, "learning_rate": 2e-4, "patience": 36,
     }]
-    criterion = FontLossFinal(vq_cfg.get("loss_weights", cfg.get("loss", {}).get("weights", {}))).to(device)
     previous_best: Path | None = None
     phase_results: list[dict[str, Any]] = []
     guard = LongRunGuard(cfg)
@@ -692,10 +701,18 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
         if resume is None and previous_best is not None:
             previous = torch.load(previous_best, map_location=device, weights_only=False)
             model.load_state_dict(previous["model"], strict=True)
-        optimizer = torch.optim.AdamW(
-            model.parameters(), lr=float(phase["learning_rate"]), betas=(0.9, 0.99),
-            weight_decay=float(vq_cfg.get("weight_decay", 1e-5)),
-        )
+        optimizer_options = {
+            "lr": float(phase["learning_rate"]),
+            "betas": (0.9, 0.99),
+            "weight_decay": float(vq_cfg.get("weight_decay", 1e-5)),
+        }
+        if bool(vq_cfg.get("fused_optimizer", True) and device.type == "cuda"):
+            optimizer_options["fused"] = True
+        try:
+            optimizer = torch.optim.AdamW(model.parameters(), **optimizer_options)
+        except (TypeError, RuntimeError):
+            optimizer_options.pop("fused", None)
+            optimizer = torch.optim.AdamW(model.parameters(), **optimizer_options)
         scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(
             optimizer, mode="min", factor=0.6, patience=max(3, int(phase.get("lr_patience", 8))), min_lr=1e-6
         )
@@ -707,14 +724,19 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
         if resume is not None:
             model.load_state_dict(resume["model"], strict=True)
             optimizer.load_state_dict(resume["optimizer"])
-            if resume.get("scheduler"):
+            previous_loss_profile = str(resume.get("loss_profile", "legacy_full_v1")).strip().lower()
+            loss_profile_changed = previous_loss_profile != loss_profile
+            if resume.get("scheduler") and not loss_profile_changed:
                 scheduler.load_state_dict(resume["scheduler"])
             if resume.get("scaler"):
                 scaler.load_state_dict(resume["scaler"])
             start_epoch = int(resume.get("epoch", 0)) + 1
-            best = float(resume.get("best", math.inf))
+            # Validation loss scales differ between the legacy generator loss
+            # and the VQ-specific fast loss. Keep learned weights and optimizer
+            # state, but reset plateau tracking exactly once after an upgrade.
+            best = math.inf if loss_profile_changed else float(resume.get("best", math.inf))
             global_step = int(resume.get("global_step", 0))
-            no_improvement = int(resume.get("no_improvement", 0))
+            no_improvement = 0 if loss_profile_changed else int(resume.get("no_improvement", 0))
         size = int(phase["size"])
         train_loader = _loader(
             VQGlyphDataset(index_path, split="train", size=size, augment=True),
@@ -726,15 +748,20 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
         )
         accumulation = max(1, int(phase.get("gradient_accumulation", 1)))
         history = _read_history(phase_dir / "history.csv")
-        checkpoint_every = max(20, int(vq_cfg.get("checkpoint_every_steps", 150)))
+        checkpoint_every = max(20, int(vq_cfg.get("checkpoint_every_steps", 240)))
+        validation_batches = max(0, int(vq_cfg.get("validation_batches", 64)))
 
         @torch.no_grad()
         def evaluate() -> dict[str, float]:
             model.eval()
             total_loss = total_dice = total_perplexity = 0.0
             seen = 0
-            for batch in val_loader:
-                target_aux = batch["target_aux"].to(device)
+            for batch_index, batch in enumerate(val_loader):
+                if validation_batches and batch_index >= validation_batches:
+                    break
+                target_aux = batch["target_aux"].to(device, non_blocking=True)
+                if channels_last:
+                    target_aux = target_aux.contiguous(memory_format=torch.channels_last)
                 with _autocast(device, amp):
                     output = model(target_aux, update_codebook=False)
                     glyph_loss, _ = criterion(
@@ -761,6 +788,8 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
             progress = tqdm(train_loader, desc=f"{phase['name']} {epoch:03d}/{int(phase['epochs']):03d}", unit="batch")
             for step, batch in enumerate(progress, start=1):
                 target_aux = batch["target_aux"].to(device, non_blocking=True)
+                if channels_last:
+                    target_aux = target_aux.contiguous(memory_format=torch.channels_last)
                 with _autocast(device, amp):
                     output = model(target_aux, update_codebook=True)
                     glyph_loss, _ = criterion(
@@ -782,6 +811,7 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
                             "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(),
                             "scaler": scaler.state_dict(), "epoch": epoch - 1, "global_step": global_step,
                             "best": best, "no_improvement": no_improvement, "model_spec": model_spec,
+                            "loss_profile": loss_profile, "channels_last": channels_last,
                         }, phase_dir / "in_epoch.pt")
                         guard.checkpoint_boundary()
                 count = target_aux.shape[0]
@@ -801,7 +831,8 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
                 "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(),
                 "scaler": scaler.state_dict(), "epoch": epoch, "global_step": global_step,
                 "best": best, "no_improvement": no_improvement, "model_spec": model_spec,
-                "validation": validation,
+                "validation": validation, "loss_profile": loss_profile,
+                "channels_last": channels_last,
             }
             _atomic_torch_save(payload, phase_dir / "last.pt")
             if improved:
@@ -817,7 +848,9 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
             if epoch == 1 or epoch % int(vq_cfg.get("preview_every", 4)) == 0 or improved:
                 model.eval()
                 batch = next(iter(val_loader))
-                target_aux = batch["target_aux"].to(device)
+                target_aux = batch["target_aux"].to(device, non_blocking=True)
+                if channels_last:
+                    target_aux = target_aux.contiguous(memory_format=torch.channels_last)
                 with torch.no_grad(), _autocast(device, amp):
                     prediction = torch.sigmoid(model(target_aux, update_codebook=False)["reconstruction"][:, :1])
                 _save_preview(
@@ -844,6 +877,8 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
         "model_spec": model_spec,
         "phases": phase_results,
         "method": "target-only VQ stroke-prior autoencoder",
+        "loss_profile": loss_profile,
+        "channels_last": channels_last,
     }
     save_json(root / "summary.json", summary)
     return summary

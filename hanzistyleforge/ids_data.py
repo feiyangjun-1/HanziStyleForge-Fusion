@@ -93,7 +93,7 @@ def install_cjkvi_ids(
         try:
             request = urllib.request.Request(
                 url,
-                headers={"User-Agent": "HanziStyleForge/2.3 CJKVI-IDS installer"},
+                headers={"User-Agent": "HanziStyleForge/2.4 CJKVI-IDS installer"},
             )
             with urllib.request.urlopen(request, timeout=max(10, int(timeout_seconds))) as response:
                 with tempfile.NamedTemporaryFile(

@@ -294,6 +294,135 @@ class FontLossFinal(nn.Module):
         return total, {key: value.detach() for key, value in reduced.items()}
 
 
+
+class VQReconstructionLoss(nn.Module):
+    """Fast multi-head reconstruction loss for the VQ autoencoder.
+
+    VQ training already predicts cached SDF, skeleton, and edge channels.  The
+    full generator loss additionally recomputes differentiable skeletons and
+    style signatures, which are useful for cross-font generation but redundant
+    and expensive for target-only autoencoding.  This loss preserves direct
+    structural supervision while avoiding those repeated morphology passes.
+    """
+
+    DEFAULT_WEIGHTS = {
+        "bce": 0.28,
+        "dice": 0.26,
+        "multiscale": 0.08,
+        "projection": 0.06,
+        "sdf": 0.15,
+        "skeleton_head": 0.11,
+        "edge_head": 0.12,
+    }
+
+    def __init__(self, weights: dict[str, float] | None = None) -> None:
+        super().__init__()
+        self.weights = dict(self.DEFAULT_WEIGHTS)
+        if weights:
+            # Only the inexpensive terms supported by this VQ-specific loss
+            # are accepted. Unknown generator-loss keys are intentionally
+            # ignored rather than silently re-enabling costly operations.
+            for key in self.DEFAULT_WEIGHTS:
+                if key in weights:
+                    self.weights[key] = float(weights[key])
+
+    def forward(
+        self,
+        prediction: torch.Tensor,
+        target: torch.Tensor,
+        sample_weight: torch.Tensor | None = None,
+        content_proxy: torch.Tensor | None = None,
+        target_aux: torch.Tensor | None = None,
+    ) -> tuple[torch.Tensor, dict[str, torch.Tensor]]:
+        del content_proxy
+        ink_logits, sdf_logits, skeleton_logits, edge_logits = split_prediction(prediction)
+        probability = torch.sigmoid(ink_logits)
+        if target_aux is None or target_aux.shape[1] < 4:
+            target_aux = FontLossFinal._fallback_aux(target)
+        target_aux = target_aux[:, :4]
+        target_sdf = target_aux[:, 1:2]
+        target_skeleton = target_aux[:, 2:3]
+        target_edge = target_aux[:, 3:4]
+
+        foreground = target.mean().detach()
+        pos_weight = ((1.0 - foreground) / (foreground + 1e-4)).clamp(1.0, 5.0)
+        bce_per = F.binary_cross_entropy_with_logits(
+            ink_logits, target, pos_weight=pos_weight, reduction="none"
+        ).mean(dim=(1, 2, 3))
+        dice_per = _dice_per(probability, target)
+
+        multiscale_per = torch.zeros_like(dice_per)
+        for scale in (2, 4, 8):
+            pooled_prediction = F.avg_pool2d(probability, scale)
+            pooled_target = F.avg_pool2d(target, scale)
+            multiscale_per = multiscale_per + (pooled_prediction - pooled_target).abs().mean(dim=(1, 2, 3))
+        multiscale_per = multiscale_per / 3.0
+
+        row_pred = probability.mean(dim=3)
+        row_true = target.mean(dim=3)
+        col_pred = probability.mean(dim=2)
+        col_true = target.mean(dim=2)
+        projection_per = (
+            (row_pred - row_true).abs().mean(dim=(1, 2))
+            + (col_pred - col_true).abs().mean(dim=(1, 2))
+        ) / 2.0
+
+        if sdf_logits is None:
+            sdf_per = torch.zeros_like(dice_per)
+        else:
+            sdf_probability = torch.sigmoid(sdf_logits)
+            contour_weight = 1.0 + 2.5 * torch.exp(-((target_sdf - 0.5) / 0.12).square())
+            sdf_per = (
+                F.smooth_l1_loss(sdf_probability, target_sdf, reduction="none") * contour_weight
+            ).mean(dim=(1, 2, 3))
+
+        if skeleton_logits is None:
+            skeleton_head_per = torch.zeros_like(dice_per)
+        else:
+            skeleton_probability = torch.sigmoid(skeleton_logits)
+            skeleton_bce = F.binary_cross_entropy_with_logits(
+                skeleton_logits, target_skeleton, reduction="none"
+            ).mean(dim=(1, 2, 3))
+            skeleton_head_per = 0.55 * skeleton_bce + 0.45 * _dice_per(
+                skeleton_probability, target_skeleton
+            )
+
+        if edge_logits is None:
+            edge_head_per = torch.zeros_like(dice_per)
+        else:
+            edge_probability = torch.sigmoid(edge_logits)
+            edge_head_per = (
+                0.55
+                * F.binary_cross_entropy_with_logits(
+                    edge_logits, target_edge, reduction="none"
+                ).mean(dim=(1, 2, 3))
+                + 0.45 * (edge_probability - target_edge).abs().mean(dim=(1, 2, 3))
+            )
+
+        pieces_per = {
+            "bce": bce_per,
+            "dice_loss": dice_per,
+            "multiscale_loss": multiscale_per,
+            "projection_loss": projection_per,
+            "sdf_loss": sdf_per,
+            "skeleton_head_loss": skeleton_head_per,
+            "edge_head_loss": edge_head_per,
+        }
+        reduced = {key: _weighted_mean(value, sample_weight) for key, value in pieces_per.items()}
+        mapping = {
+            "bce": "bce",
+            "dice": "dice_loss",
+            "multiscale": "multiscale_loss",
+            "projection": "projection_loss",
+            "sdf": "sdf_loss",
+            "skeleton_head": "skeleton_head_loss",
+            "edge_head": "edge_head_loss",
+        }
+        total = torch.zeros((), device=probability.device, dtype=probability.dtype)
+        for weight_key, piece_key in mapping.items():
+            total = total + float(self.weights.get(weight_key, 0.0)) * reduced[piece_key]
+        return total, {key: value.detach() for key, value in reduced.items()}
+
 def batch_binary_dice(probability: torch.Tensor, target: torch.Tensor, threshold: float = 0.5) -> torch.Tensor:
     if probability.shape[1] > 1:
         probability = probability[:, :1]

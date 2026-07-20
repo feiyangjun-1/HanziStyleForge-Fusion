@@ -16,7 +16,7 @@ from hanzistyleforge.fusion_training import _style_plateau_state, _style_quality
 from hanzistyleforge.contract import DataFlowContractError, validate_data_flow_contract
 from hanzistyleforge.decomposition import component_zones, load_decompositions, parse_ids_expression
 from hanzistyleforge.marathon_refine import run_marathon_refinement
-from hanzistyleforge.losses import FontLossFinal
+from hanzistyleforge.losses import FontLossFinal, VQReconstructionLoss
 from hanzistyleforge.inference import _emergency_fallback_row
 from hanzistyleforge.model import FontStyleNetFinal, GlyphRefinerFinal, PatchDiscriminatorFinal
 from hanzistyleforge.proxy import (
@@ -379,6 +379,10 @@ def main() -> None:
     assert torch.isfinite(loss)
     for key in ("proxy_skeleton_loss", "sdf_loss", "skeleton_head_loss", "topology_point_loss", "style_signature_loss"):
         assert key in pieces and torch.isfinite(pieces[key])
+    vq_loss, vq_pieces = VQReconstructionLoss()(logits, target, target_aux=target_aux)
+    assert torch.isfinite(vq_loss)
+    for key in ("sdf_loss", "skeleton_head_loss", "edge_head_loss"):
+        assert key in vq_pieces and torch.isfinite(vq_pieces[key])
 
     generator_ink = torch.sigmoid(ink_logits)
     refiner = GlyphRefinerFinal(base=2).eval()

@@ -1,6 +1,6 @@
 {
   "project": "HanziStyleForge Fusion",
-  "version": "2.3.0-fusion",
+  "version": "2.4.0-fusion",
   "checkpoint_format": 300,
   "license": "Apache-2.0",
   "copyright": "Copyright 2026 feiyangjun_",
@@ -10,7 +10,7 @@
     "data/cjkvi-ids/source.json"
   ],
   "file_count": 80,
-  "total_bytes": 816185,
+  "total_bytes": 827879,
   "files": [
     {
       "path": ".gitignore",
@@ -24,13 +24,13 @@
     },
     {
       "path": "CHANGELOG.md",
-      "bytes": 3090,
-      "sha256": "0a6e5c6ceb5cd0c3fb0c25bcaed98ff8cf4853cbe88609cb151d349cd82fe8f4"
+      "bytes": 3781,
+      "sha256": "0308bcb74330743dbd5ac6604a096da9972faa78323199dcf727396539b05f00"
     },
     {
       "path": "CITATION.cff",
       "bytes": 274,
-      "sha256": "b5e11d0c9b902834c6ee155cd8d8c9372bcaee4ec38d45244ea46d46aa2b20c7"
+      "sha256": "9a031ca5198233db0656108280abbfc13d041e0f63c6c546a1936efecb3aef25"
     },
     {
       "path": "CONTRIBUTING.md",
@@ -50,7 +50,7 @@
     {
       "path": "METHOD_REFERENCES.md",
       "bytes": 3686,
-      "sha256": "fee793f2db5eb1f2c76cf298fe712c2172259bd9e888409f77e95e0b6e91ba55"
+      "sha256": "dd8822860a324dd06d0b0dcdbd372fdd97b48baa06d7b00331e2f5c137738844"
     },
     {
       "path": "NOTICE",
@@ -60,27 +60,27 @@
     {
       "path": "QUICK_START.txt",
       "bytes": 1453,
-      "sha256": "df45618d22e985802bdd718008331f587343e42db541e90e6029da1dd50dcc58"
+      "sha256": "7c000bb8dedc3ed5f580c98c75caab861b91a94952c3ce0f69dec2fe525c0ee3"
     },
     {
       "path": "README.ja.md",
-      "bytes": 12857,
-      "sha256": "be7cf3f99589ee4cd62886a262e5d1fa5f66976078c39d87deb4dd57f55b8d1f"
+      "bytes": 13315,
+      "sha256": "3ad4015099e2129d87f78e66ec9feab473a6e280f057fd84d1ebbc256b28209c"
     },
     {
       "path": "README.ko.md",
-      "bytes": 12163,
-      "sha256": "1fa5f81715fb32966fe03972b8a0cc2524c5df83ca1607c041a65f921c6b8577"
+      "bytes": 12602,
+      "sha256": "8735b0645b42a42a8c154581addb74bc0e7811358f0d242cd971e9776d20f679"
     },
     {
       "path": "README.md",
-      "bytes": 11640,
-      "sha256": "02fb4fb75a62ec08261bf9377607c3efee7969e4c1708f7526864f4a1b4ca399"
+      "bytes": 12026,
+      "sha256": "74a9d838b966341dd45dd6f10119783e7314d34e9c83884593e5258328e1b32a"
     },
     {
       "path": "README.zh-CN.md",
-      "bytes": 10315,
-      "sha256": "b375705d701dbcf1085c4ab8b4c99daf63dc89c26c9cc2c1a42ec424ad11a51c"
+      "bytes": 10689,
+      "sha256": "8f5ee2106ef290fbc01d320ecb6b2252b6bea37220b881c61f1d3b2bd2ba8705"
     },
     {
       "path": "SECURITY.md",
@@ -89,8 +89,8 @@
     },
     {
       "path": "TEST_REPORT.md",
-      "bytes": 3506,
-      "sha256": "14d30052eb2600a872bfef220d6de76aa2fdac95dd4c2c77b58afed5509e04f5"
+      "bytes": 4046,
+      "sha256": "809aed8981166c3bd705dc53a33cead73ae55a66a16816c226ee04e34ae56417"
     },
     {
       "path": "THIRD_PARTY_NOTICES.md",
@@ -98,14 +98,14 @@
       "sha256": "fa346218a98e62b12985d5f28a6fa8082d6005c21457364526c5754454acfabf"
     },
     {
-      "path": "UPGRADE_FROM_2.2.txt",
-      "bytes": 1400,
-      "sha256": "5048c5e3619344b21ac25372295039f4f6a50ad328d5cf4b8ec9ced61c12d72a"
+      "path": "UPGRADE_FROM_2.3.txt",
+      "bytes": 1230,
+      "sha256": "cd797f0430ae733d9243cfd3935a870d0b0b0c2c4bac06586829cd8d878af092"
     },
     {
       "path": "VERSION.txt",
       "bytes": 79,
-      "sha256": "ab5897666178d3fe1acbeecbfbab2e23ff8124c096aa2061d85a847c4707da8d"
+      "sha256": "e5a3fe5724338ee5a19bf3d34639f4178f6e414aa9daac046854c5ed47a27820"
     },
     {
       "path": "build/.gitkeep",
@@ -114,28 +114,28 @@
     },
     {
       "path": "config.json",
-      "bytes": 15251,
-      "sha256": "a3799066e98c3a04958d056d6d24855661f3132950c7368d1a6fdeed2669009c"
+      "bytes": 15339,
+      "sha256": "b4b3de312c1fb58a782e9f1fec4f7fd26104ff2d208d2cf34400bcee2655b0da"
     },
     {
       "path": "config_fast_test.json",
-      "bytes": 12672,
-      "sha256": "612d1ea97feabc87d3278b1c60811544123e174983eb63404708ea91f5f34ad2"
+      "bytes": 12759,
+      "sha256": "02712832b201daea228819b364f9ea517b0645b7bc90640d76b6e571bdef3c36"
     },
     {
       "path": "config_fusion_fast_test.json",
-      "bytes": 12672,
-      "sha256": "612d1ea97feabc87d3278b1c60811544123e174983eb63404708ea91f5f34ad2"
+      "bytes": 12759,
+      "sha256": "02712832b201daea228819b364f9ea517b0645b7bc90640d76b6e571bdef3c36"
     },
     {
       "path": "config_fusion_months_12gb.json",
-      "bytes": 15251,
-      "sha256": "a3799066e98c3a04958d056d6d24855661f3132950c7368d1a6fdeed2669009c"
+      "bytes": 15339,
+      "sha256": "b4b3de312c1fb58a782e9f1fec4f7fd26104ff2d208d2cf34400bcee2655b0da"
     },
     {
       "path": "config_months_12gb.json",
-      "bytes": 15251,
-      "sha256": "a3799066e98c3a04958d056d6d24855661f3132950c7368d1a6fdeed2669009c"
+      "bytes": 15339,
+      "sha256": "b4b3de312c1fb58a782e9f1fec4f7fd26104ff2d208d2cf34400bcee2655b0da"
     },
     {
       "path": "data/README_CJKVI_IDS.txt",
@@ -155,7 +155,7 @@
     {
       "path": "hanzistyleforge/__init__.py",
       "bytes": 29,
-      "sha256": "837c6ab2923797835312ee14681622a706d47eb54f6047382e70d1cfcb57771b"
+      "sha256": "63a553280fa919d6880486c23eed7a46c419339fded8ad70d53ae0ba803be09c"
     },
     {
       "path": "hanzistyleforge/analysis.py",
@@ -189,8 +189,8 @@
     },
     {
       "path": "hanzistyleforge/config.py",
-      "bytes": 21980,
-      "sha256": "2285f043e93fbc20421da8649b7b282662978801d9210976490f3e9cf7408d38"
+      "bytes": 22108,
+      "sha256": "28b6824958da2a78d624bee6a4cc8eb308b00f84c90ea9a71e4ded73ff38bb80"
     },
     {
       "path": "hanzistyleforge/contour_polish.py",
@@ -239,8 +239,8 @@
     },
     {
       "path": "hanzistyleforge/fusion_model.py",
-      "bytes": 27230,
-      "sha256": "f9ff0862541b19bc34bb1b969f338ca2679f07f68bcaf0adb58fc974b941ff40"
+      "bytes": 27683,
+      "sha256": "c7b9dcbfac4aa1c2422eec87e39e59b9755c207a093eeb1f5f0a183a9c5aa495"
     },
     {
       "path": "hanzistyleforge/fusion_selftest.py",
@@ -249,13 +249,13 @@
     },
     {
       "path": "hanzistyleforge/fusion_training.py",
-      "bytes": 92403,
-      "sha256": "d7bbf8c0d68c9f43ccc58b867be68f220f305eb0d77bb4badab162af2b64364c"
+      "bytes": 94697,
+      "sha256": "954942a0d982d17e02fd27f14cc8ea051ce0d58133bc03f2c035f2f32da06ef9"
     },
     {
       "path": "hanzistyleforge/ids_data.py",
       "bytes": 5875,
-      "sha256": "9e8b2b49f3b869c4f6af9921b99f3e5e3a542b51dff7dc7dfa233f6305c5c2aa"
+      "sha256": "269c99802e04a7e8b2b7e019f7e9f1f41cd90adfc9ed2ac59e692c5bb236e90d"
     },
     {
       "path": "hanzistyleforge/inference.py",
@@ -269,8 +269,8 @@
     },
     {
       "path": "hanzistyleforge/losses.py",
-      "bytes": 14142,
-      "sha256": "7355400d00c8cf69e45507fd942c0f238a7078db989be6fdb9ecd405adaadce1"
+      "bytes": 19525,
+      "sha256": "479d7f198f6fd55e0fb93e7ec3def44a2e23d7e4f6f9af6bf8c3b207e445cee3"
     },
     {
       "path": "hanzistyleforge/marathon.py",
@@ -360,7 +360,7 @@
     {
       "path": "pyproject.toml",
       "bytes": 1357,
-      "sha256": "08ccfe60277bd2ba786d442f8e47d5a34f8b1f6665d16544384a57035fbeb7d2"
+      "sha256": "c09f1ab543db6cf5cd8095ead95559822dc6c6064fb96a2156d5fe03aba676a8"
     },
     {
       "path": "refs/PUT_REF_FONT_HERE.txt",
@@ -389,8 +389,8 @@
     },
     {
       "path": "selftest.py",
-      "bytes": 17965,
-      "sha256": "54a931955729b91023e972bf1b0d3e7597c9c7ce93481eaf082c278e61d14897"
+      "bytes": 18245,
+      "sha256": "ef33a0044bc3dac3b20a68c19fdcd4075b5b59e78bb8b253d5f56e92cf816401"
     },
     {
       "path": "test_chars.txt",

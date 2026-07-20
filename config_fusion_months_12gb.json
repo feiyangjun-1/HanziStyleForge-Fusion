@@ -296,17 +296,15 @@
       "commitment_weight": 0.24,
       "weight_decay": 8e-05,
       "preview_every": 4,
-      "checkpoint_every_steps": 140,
+      "checkpoint_every_steps": 240,
       "loss_weights": {
         "bce": 0.28,
         "dice": 0.26,
-        "edge": 0.15,
         "multiscale": 0.08,
         "projection": 0.06,
-        "cldice": 0.06,
         "sdf": 0.15,
-        "skeleton_head": 0.08,
-        "edge_head": 0.08
+        "skeleton_head": 0.11,
+        "edge_head": 0.12
       },
       "phases": [
         {
@@ -339,7 +337,11 @@
           "minimum_learning_rate": 2.5e-07,
           "patience": 34
         }
-      ]
+      ],
+      "loss_profile": "fast_balanced_v1",
+      "channels_last": true,
+      "fused_optimizer": true,
+      "validation_batches": 64
     },
     "direct_baseline": {
       "enabled": true,
@@ -584,6 +586,6 @@
   },
   "project": {
     "name": "HanziStyleForge Fusion",
-    "version": "2.3.0"
+    "version": "2.4.0"
   }
 }
