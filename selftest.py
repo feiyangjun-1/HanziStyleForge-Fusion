@@ -14,7 +14,7 @@ from hanzistyleforge.features import expand_proxy_channels, make_target_aux, spl
 from hanzistyleforge.fusion_selftest import run_fusion_selftest
 from hanzistyleforge.fusion_training import _style_plateau_state, _style_quality_gate
 from hanzistyleforge.contract import DataFlowContractError, validate_data_flow_contract
-from hanzistyleforge.decomposition import component_zones, load_decompositions
+from hanzistyleforge.decomposition import component_zones, load_decompositions, parse_ids_expression
 from hanzistyleforge.marathon_refine import run_marathon_refinement
 from hanzistyleforge.losses import FontLossFinal
 from hanzistyleforge.inference import _emergency_fallback_row
@@ -117,13 +117,28 @@ def main() -> None:
         )
     )
     assert "reference_raw" in fallbacks
-    decompositions = load_decompositions(Path(__file__).parent / "data" / "cjk-decomp.txt")
-    assert 0x660E in decompositions
-    zones = component_zones(0x660E, ink, decompositions, fallback_grid=3)
-    assert len(zones) >= 2 and all(zone.shape == ink.shape for zone in zones)
+    assert parse_ids_expression("⿱⿰日月木").serialize() == "⿱⿰日月木"
+    with tempfile.TemporaryDirectory() as ids_directory:
+        ids_path = Path(ids_directory) / "ids.txt"
+        ids_path.write_text(
+            "# synthetic standard IDS test data\n"
+            "U+660E\t明\t⿰日月\n"
+            "U+4EAE\t亮\t⿱⿳亠口冖几[G]\t⿱亠兄[TJ]\n",
+            encoding="utf-8",
+        )
+        decompositions = load_decompositions(ids_path, region_priority=["G"])
+        assert 0x660E in decompositions
+        assert decompositions[0x4EAE].regions == ("G",)
+        zones = component_zones(0x660E, ink, decompositions, fallback_grid=3)
+        assert len(zones) >= 2 and all(zone.shape == ink.shape for zone in zones)
 
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
+        local_ids_path = root / "ids.txt"
+        local_ids_path.write_text(
+            "# synthetic standard IDS test data\nU+660E\t明\t⿰日月\n",
+            encoding="utf-8",
+        )
         proxy_path = root / "proxy.png"
         ink_path = root / "ink.png"
         atlas_path = root / "atlas.npz"
@@ -235,7 +250,8 @@ def main() -> None:
                 "global_search_trials": 2, "local_sweeps": 1, "zone_grid": 2,
                 "save_every_glyphs": 1, "maximum_glyphs": 0,
                 "use_component_layout": True,
-                "decomposition_file": str(Path(__file__).parent / "data" / "cjk-decomp.txt"),
+                "decomposition_file": str(local_ids_path),
+                "auto_download": False,
             }},
         }
         refined_summary = run_marathon_refinement(refine_cfg)

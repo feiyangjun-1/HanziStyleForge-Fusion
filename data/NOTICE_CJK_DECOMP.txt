@@ -1,4 +1,0 @@
-CJK Decomposition Data
-Source: https://github.com/amake/cjk-decomp
-The data file is distributed under multiple licenses; this package uses it under Apache License 2.0.
-The data is used only as an optional top-level layout hint for local glyph repair.

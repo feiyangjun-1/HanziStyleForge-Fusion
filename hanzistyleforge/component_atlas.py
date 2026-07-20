@@ -11,7 +11,8 @@ from typing import Any
 import cv2
 import numpy as np
 
-from .decomposition import Decomposition, load_decompositions, _bbox, _region_splits, _token_codepoint
+from .decomposition import Decomposition, decomposition_regions, load_decompositions
+from .ids_data import IDSDataError, ensure_decomposition_data
 from .proxy import read_ink, read_proxy
 from .util import ensure_dir, read_csv, save_json, sha256_file
 
@@ -24,55 +25,6 @@ class ComponentRegion:
     path: str
 
 
-def _normalize_kind(kind: str) -> str:
-    value = str(kind).lower().strip()
-    if value.startswith("a"):
-        return "horizontal"
-    if value.startswith("d"):
-        return "vertical"
-    if value.startswith(("s", "w", "st", "sl", "sr")):
-        return "surround"
-    return "unknown"
-
-
-def _child_rectangles(
-    item: Decomposition,
-    mask: np.ndarray,
-    rect: tuple[int, int, int, int],
-) -> list[tuple[int, int, int, int]]:
-    x0, y0, x1, y1 = rect
-    count = len(item.components)
-    kind = _normalize_kind(item.kind)
-    if count <= 0:
-        return []
-    if kind == "horizontal" and count >= 2:
-        splits = [x0, *_region_splits(mask, rect, count, axis=1), x1]
-        return [(left, y0, right, y1) for left, right in zip(splits[:-1], splits[1:])]
-    if kind == "vertical" and count >= 2:
-        splits = [y0, *_region_splits(mask, rect, count, axis=0), y1]
-        return [(x0, top, x1, bottom) for top, bottom in zip(splits[:-1], splits[1:])]
-    if kind == "surround" and count >= 2:
-        width = x1 - x0
-        height = y1 - y0
-        margin_x = max(2, int(round(width * 0.20)))
-        margin_y = max(2, int(round(height * 0.20)))
-        inner = (x0 + margin_x, y0 + margin_y, x1 - margin_x, y1 - margin_y)
-        output = [rect, inner]
-        if count > 2:
-            output.extend([inner] * (count - 2))
-        return output[:count]
-    # Unknown operators are kept usable by a deterministic horizontal/vertical
-    # fallback chosen from the region aspect ratio.
-    if count == 1:
-        return [rect]
-    axis = 1 if (x1 - x0) >= (y1 - y0) else 0
-    if axis == 1:
-        splits = [x0, *_region_splits(mask, rect, count, axis=1), x1]
-        return [(left, y0, right, y1) for left, right in zip(splits[:-1], splits[1:])]
-    splits = [y0, *_region_splits(mask, rect, count, axis=0), y1]
-    return [(x0, top, x1, bottom) for top, bottom in zip(splits[:-1], splits[1:])]
-
-
 def labeled_component_regions(
     codepoint: int,
     mask: np.ndarray,
@@ -82,41 +34,18 @@ def labeled_component_regions(
     maximum_regions: int = 48,
     minimum_region_size: int = 10,
 ) -> list[ComponentRegion]:
-    source = np.asarray(mask, dtype=np.float32)
-    root = _bbox(source)
-    regions: list[ComponentRegion] = []
-
-    def visit(cp: int, rect: tuple[int, int, int, int], depth: int, path: str) -> None:
-        if depth >= maximum_depth or len(regions) >= maximum_regions:
-            return
-        item = decompositions.get(int(cp))
-        if item is None:
-            return
-        children = _child_rectangles(item, source, rect)
-        for index, (token, child_rect) in enumerate(zip(item.components, children)):
-            if len(regions) >= maximum_regions:
-                break
-            x0, y0, x1, y1 = child_rect
-            if x1 - x0 < minimum_region_size or y1 - y0 < minimum_region_size:
-                continue
-            label = str(token).strip()
-            child_path = f"{path}/{index}:{label}"
-            regions.append(ComponentRegion(label=label, rect=child_rect, depth=depth, path=child_path))
-            child_cp = _token_codepoint(label)
-            if child_cp is not None and child_cp != cp:
-                visit(child_cp, child_rect, depth + 1, child_path)
-
-    visit(int(codepoint), root, 0, f"U+{int(codepoint):04X}")
-    # Remove near-identical aliases while retaining the shallowest occurrence.
-    unique: list[ComponentRegion] = []
-    seen: set[tuple[str, int, int, int, int]] = set()
-    for region in sorted(regions, key=lambda item: (item.depth, item.path)):
-        key = (region.label, *region.rect)
-        if key in seen:
-            continue
-        seen.add(key)
-        unique.append(region)
-    return unique[:maximum_regions]
+    records = decomposition_regions(
+        int(codepoint),
+        np.asarray(mask, dtype=np.float32),
+        decompositions,
+        maximum_depth=max(1, int(maximum_depth)),
+        maximum_regions=max(1, int(maximum_regions)),
+        minimum_region_size=max(2, int(minimum_region_size)),
+    )
+    return [
+        ComponentRegion(label=label, rect=rect, depth=depth, path=path)
+        for label, rect, depth, path, _ in records
+    ]
 
 
 def _crop_resize(array: np.ndarray, rect: tuple[int, int, int, int], size: int) -> np.ndarray:
@@ -174,11 +103,25 @@ def build_component_atlas(
         return summary
 
     dataset_path = Path(dataset_csv) if dataset_csv is not None else work / "dataset" / "index.csv"
-    decomposition_path = Path(component_cfg.get("decomposition_file", "data/cjk-decomp.txt"))
     if not dataset_path.is_file():
         raise FileNotFoundError(f"missing dataset index: {dataset_path}")
+    try:
+        decomposition_path, ids_status = ensure_decomposition_data(component_cfg)
+    except IDSDataError as exc:
+        summary = {
+            "enabled": False,
+            "reason": str(exc),
+            "data_source": "cjkvi/cjkvi-ids",
+        }
+        save_json(summary_path, summary)
+        return summary
     if not decomposition_path.is_file():
-        summary = {"enabled": False, "reason": f"missing decomposition file: {decomposition_path}"}
+        summary = {
+            "enabled": False,
+            "reason": f"missing optional CJKVI IDS file: {decomposition_path}",
+            "data_source": "cjkvi/cjkvi-ids",
+            "ids_status": ids_status,
+        }
         save_json(summary_path, summary)
         return summary
 
@@ -198,7 +141,11 @@ def build_component_atlas(
         except Exception:
             pass
 
-    decompositions = load_decompositions(decomposition_path)
+    decompositions = load_decompositions(
+        decomposition_path,
+        region_priority=component_cfg.get("region_priority", []),
+        include_obsolete=bool(component_cfg.get("include_obsolete", False)),
+    )
     rows = [row for row in read_csv(dataset_path) if row.get("mode") == "self"]
     rng = random.Random(int(cfg.get("training", {}).get("seed", 20260719)))
     patch_size = max(24, int(component_cfg.get("stored_patch_size", 96)))
@@ -295,7 +242,10 @@ def build_component_atlas(
     labels_path.write_text(json.dumps(labels_payload, ensure_ascii=False, indent=2), encoding="utf-8")
     summary = {
         "enabled": True,
-        "method": "semantic component residual atlas",
+        "method": "semantic component residual atlas with standard Unicode IDS layouts",
+        "data_source": "cjkvi/cjkvi-ids",
+        "ids_status": ids_status,
+        "decomposition_record_count": len(decompositions),
         "component_label_count": len(label_table),
         "patch_count": len(descriptors),
         "seen_patch_count": seen_total,

@@ -217,9 +217,14 @@
       "save_every_glyphs": 1,
       "maximum_glyphs": 0,
       "use_component_layout": true,
-      "decomposition_file": "data/cjk-decomp.txt",
+      "decomposition_file": "data/cjkvi-ids/ids.txt",
       "component_depth": 3,
-      "maximum_component_zones": 48
+      "maximum_component_zones": 48,
+      "auto_download": true,
+      "source_url": "https://raw.githubusercontent.com/cjkvi/cjkvi-ids/86b4d16159f0079437870408f0ca186e529015db/ids.txt",
+      "source_sha256": "bfc70a8c09f9f5616ebf0543bd6681e67314e9f7ae2307e5ae8c6f15bdc5c6a6",
+      "region_priority": [],
+      "include_obsolete": false
     }
   },
   "fusion": {
@@ -383,7 +388,7 @@
     },
     "component_atlas": {
       "enabled": true,
-      "decomposition_file": "data/cjk-decomp.txt",
+      "decomposition_file": "data/cjkvi-ids/ids.txt",
       "stored_patch_size": 32,
       "descriptor_size": 4,
       "maximum_patches": 512,
@@ -393,7 +398,12 @@
       "minimum_activity": 0.005,
       "knn": 2,
       "strength": 0.94,
-      "distance_temperature": 0.85
+      "distance_temperature": 0.85,
+      "auto_download": true,
+      "source_url": "https://raw.githubusercontent.com/cjkvi/cjkvi-ids/86b4d16159f0079437870408f0ca186e529015db/ids.txt",
+      "source_sha256": "bfc70a8c09f9f5616ebf0543bd6681e67314e9f7ae2307e5ae8c6f15bdc5c6a6",
+      "region_priority": [],
+      "include_obsolete": false
     },
     "contour_polisher": {
       "enabled": true,
@@ -475,6 +485,6 @@
   },
   "project": {
     "name": "HanziStyleForge Fusion",
-    "version": "2.2.0"
+    "version": "2.3.0"
   }
 }

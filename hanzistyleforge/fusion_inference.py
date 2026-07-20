@@ -18,6 +18,7 @@ from .component_atlas import ComponentAtlas, render_component_candidate
 from .contract import validate_data_flow_contract
 from .dataset import expand_proxy_channels
 from .decomposition import load_decompositions
+from .ids_data import IDSDataError, ensure_decomposition_data
 from .features import split_prediction
 from .fusion_diffusion import DiffusionSchedule, classifier_free_guidance_sample
 from .fusion_training import (
@@ -348,11 +349,19 @@ def generate_fusion_and_select(cfg: dict[str, Any], *, output_subdir: str = "gen
     component_cfg = fusion_cfg.get("component_atlas", {})
     component_atlas_path = work / "component_atlas" / "atlas.npz"
     component_labels_path = work / "component_atlas" / "labels.json"
-    decomposition_path = Path(component_cfg.get("decomposition_file", "data/cjk-decomp.txt"))
+    try:
+        decomposition_path, _ = ensure_decomposition_data(component_cfg)
+    except IDSDataError as exc:
+        decomposition_path = Path(component_cfg.get("decomposition_file", "data/cjkvi-ids/ids.txt"))
+        print(f"Optional CJKVI IDS component hints are unavailable: {exc}")
     if bool(component_cfg.get("enabled", True)) and component_atlas_path.is_file() and component_labels_path.is_file():
         component_atlas = ComponentAtlas.load(component_atlas_path, component_labels_path)
         if decomposition_path.is_file():
-            decompositions = load_decompositions(decomposition_path)
+            decompositions = load_decompositions(
+                decomposition_path,
+                region_priority=component_cfg.get("region_priority", []),
+                include_obsolete=bool(component_cfg.get("include_obsolete", False)),
+            )
 
     style_profile = load_json(work / "dataset" / "style_profile.json")
     profiles_path = work / "dataset" / "style_profiles.json"

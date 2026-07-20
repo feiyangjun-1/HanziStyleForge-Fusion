@@ -15,6 +15,7 @@ from tqdm import tqdm
 
 from .config import CHECKPOINT_FORMAT_VERSION
 from .decomposition import component_zones, load_decompositions
+from .ids_data import IDSDataError, ensure_decomposition_data
 from .longrun import LongRunGuard
 from .proxy import (
     affine_mask,
@@ -420,8 +421,18 @@ def run_marathon_refinement(cfg: dict[str, Any]) -> dict[str, Any]:
     analysis_rows = {int(row["codepoint"]): row for row in read_csv(work / "audit" / "analysis.csv")}
     profiles_path = work / "dataset" / "style_profiles.json"
     style_profiles = load_json(profiles_path) if profiles_path.is_file() else {"global": load_json(work / "dataset" / "style_profile.json"), "bins": []}
-    decomposition_path = Path(refine_cfg.get("decomposition_file", "data/cjk-decomp.txt"))
-    decompositions = load_decompositions(decomposition_path) if bool(refine_cfg.get("use_component_layout", True)) else {}
+    decomposition_path = Path(refine_cfg.get("decomposition_file", "data/cjkvi-ids/ids.txt"))
+    decompositions: dict[int, Any] = {}
+    if bool(refine_cfg.get("use_component_layout", True)):
+        try:
+            decomposition_path, _ = ensure_decomposition_data(refine_cfg)
+            decompositions = load_decompositions(
+                decomposition_path,
+                region_priority=refine_cfg.get("region_priority", []),
+                include_obsolete=bool(refine_cfg.get("include_obsolete", False)),
+            )
+        except IDSDataError as exc:
+            print(f"Optional CJKVI IDS refinement hints are unavailable: {exc}")
 
     refined_dir = ensure_dir(work / "refined")
     chosen_dir = ensure_dir(refined_dir / "chosen")

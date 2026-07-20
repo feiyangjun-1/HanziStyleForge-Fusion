@@ -30,3 +30,6 @@ refs/*.otc
 *.bak
 STOP_AFTER_CHECKPOINT
 *.hanzistyleforge.lock
+# Optional upstream IDS data downloaded directly by the user
+data/cjkvi-ids/*
+!data/cjkvi-ids/.gitkeep

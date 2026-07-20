@@ -17,6 +17,7 @@ from hanzistyleforge.ensemble import run_ensemble_training
 from hanzistyleforge.inference import generate_and_select
 from hanzistyleforge.fusion_training import train_fusion_all
 from hanzistyleforge.fusion_inference import generate_fusion_and_select
+from hanzistyleforge.ids_data import install_cjkvi_ids
 from hanzistyleforge.longrun import SafeStopRequested
 from hanzistyleforge.marathon import marathon_status, run_marathon_training
 from hanzistyleforge.marathon_refine import run_marathon_refinement
@@ -115,6 +116,23 @@ def command_status(cfg: dict[str, Any]) -> dict[str, Any]:
 def command_contract(cfg: dict[str, Any]) -> dict[str, Any]:
     result = validate_data_flow_contract(cfg, require_prepared=True, write_report=True)
     _print(result)
+    return result
+
+
+def command_ids_install(cfg: dict[str, Any], force: bool = False) -> dict[str, Any]:
+    component_cfg = cfg.get("fusion", {}).get("component_atlas", {})
+    result = install_cjkvi_ids(
+        component_cfg.get("decomposition_file", "data/cjkvi-ids/ids.txt"),
+        force=force,
+        url=str(component_cfg.get("source_url", "https://raw.githubusercontent.com/cjkvi/cjkvi-ids/86b4d16159f0079437870408f0ca186e529015db/ids.txt")),
+        expected_sha256=str(component_cfg.get("source_sha256", "bfc70a8c09f9f5616ebf0543bd6681e67314e9f7ae2307e5ae8c6f15bdc5c6a6")),
+    )
+    _print(result)
+    print(
+        "\nThe IDS file was downloaded directly from cjkvi/cjkvi-ids and is not "
+        "redistributed as part of HanziStyleForge. Review the upstream CHISE/CJKVI "
+        "license terms before redistributing the downloaded file."
+    )
     return result
 
 
@@ -250,6 +268,8 @@ def make_parser() -> argparse.ArgumentParser:
     commands.add_parser("build", help="Build the TTF and verify complete preservation of target non-Han content")
     commands.add_parser("status", help="Display long-run status without modifying state")
     commands.add_parser("contract", help="Verify the data-flow contract: training reads target only, generation reads ref only")
+    ids_install = commands.add_parser("ids-install", help="Download and verify the pinned optional cjkvi/cjkvi-ids data file")
+    ids_install.add_argument("--force", action="store_true")
     commands.add_parser("fusion-train", help="Train the style encoder, VQ codebook, latent diffusion model, multi-expert refiner, and contour Transformer")
     commands.add_parser("fusion-generate", help="Generate with multiple models and cover every Han glyph in ref.otf")
     commands.add_parser("fusion-status", help="Display Fusion long-run status without modifying state")
@@ -279,6 +299,7 @@ def dispatch(args: argparse.Namespace, cfg: dict[str, Any]) -> None:
     elif command == "build": command_build(cfg)
     elif command == "status": command_status(cfg)
     elif command == "contract": command_contract(cfg)
+    elif command == "ids-install": command_ids_install(cfg, args.force)
     elif command == "fusion-train": command_fusion_train(cfg)
     elif command == "fusion-generate": command_fusion_generate(cfg)
     elif command == "fusion-status": command_fusion_status(cfg)
