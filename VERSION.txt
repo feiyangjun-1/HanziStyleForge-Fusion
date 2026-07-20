@@ -1,4 +1,0 @@
-HanziStyleForge Fusion 2.2.0
-checkpoint-format=300
-license=Apache-2.0
-copyright=Copyright 2026 feiyangjun_
