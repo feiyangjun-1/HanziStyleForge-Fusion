@@ -1,9 +1,0 @@
-cff-version: 1.2.0
-title: HanziStyleForge Fusion
-message: "If you use this software in research, cite this repository and the upstream methods relevant to your work."
-type: software
-authors:
-  - name: feiyangjun_
-version: 2.2.0
-date-released: 2026-07-20
-license: Apache-2.0
