@@ -4,7 +4,8 @@
 
 一个面向 Windows、支持长期断点恢复的汉字字形重建系统：**仅从 `target.ttf` 学习字体风格**，**仅从 `ref.otf` 获取汉字结构和目标字符范围**，重新生成参考字体覆盖的全部 Han 码位，并验证目标字体中的非 Han 字形和主要 OpenType 工程数据未被破坏。
 
-> 当前状态：研究与工程 Alpha 版本。生成字体在发布前仍需进行视觉检查、排版软件测试和授权确认。
+### 注意：本项目使用 GPL 3.0 协议。并且禁止将本项目及其生成的字体用于商业用途！
+### 为避免协议冲突，请确保 target 字体与 ref 字体为同一协议。
 
 ## 核心数据职责
 
@@ -110,27 +111,6 @@ Python 3.10-3.14 64 位
    open_qa.bat
    ```
 
-## 保留的 Windows 启动脚本
-
-只保留正常使用所需的脚本：
-
-| 文件 | 用途 |
-|---|---|
-| `install_cuda130.bat` | 创建 `.venv`、安装依赖并验证 CUDA |
-| `verify_project.bat` | 运行自测和项目检查 |
-| `run_months_resilient.bat` | 开始或恢复完整可恢复流程 |
-| `request_safe_stop.bat` | 在下一个持久检查点停止 |
-| `run_status.bat` | 只读显示进度 |
-| `open_qa.bat` | 打开 HTML QA 报告 |
-
-高级阶段可直接使用 Python CLI：
-
-```powershell
-.venv\Scripts\python.exe hanzistyleforge.py --help
-.venv\Scripts\python.exe hanzistyleforge.py --config config_fusion_months_12gb.json fusion-train
-.venv\Scripts\python.exe hanzistyleforge.py --config config_fusion_months_12gb.json fusion-generate
-```
-
 ## 正式配置
 
 主要配置文件：`config_fusion_months_12gb.json`。
@@ -232,23 +212,6 @@ HanziStyleForge Fusion 是独立实现。下列公开项目和论文为架构方
 
 参考公开方法不等于获得复制实现、数据集、字体或模型权重的许可。若后续加入任何上游材料，必须保留其版权声明并遵守当前许可证。
 
-## 许可证和字体权利
+## 温馨提示
 
-```text
-Copyright 2026 feiyangjun_
-```
-
-HanziStyleForge 源码和项目文档采用 [Apache License 2.0](LICENSE)，另行标识的第三方材料除外。
-
-该许可证不授予任何用户输入字体的权利。使用者需要自行确认 `target.ttf` 和 `ref.otf` 的授权是否允许训练、修改、创建衍生字体和分发。生成字体与检查点可能仍受一个或两个输入字体许可证约束。
-
-## 其他文档
-
-- [架构](ARCHITECTURE.md)
-- [数据流契约](DATA_FLOW.md)
-- [方法参考](METHOD_REFERENCES.md)
-- [第三方声明](THIRD_PARTY_NOTICES.md)
-- [测试报告](TEST_REPORT.md)
-- [贡献指南](CONTRIBUTING.md)
-- [安全策略](SECURITY.md)
-- [更新记录](CHANGELOG.md)
+本项目完全使用 GPT5.6-Sol 生成，作者完全不懂代码。欢迎任何人 pull request 对本项目改进。所有 pull request 也会由 GPT 进行审查。
