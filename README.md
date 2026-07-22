@@ -1,6 +1,8 @@
 # HanziStyleForge Fusion
 
 一个面向 Windows、支持长期断点恢复的汉字字形重建系统：**仅从 `target.ttf` 学习字体风格**，**仅从 `ref.otf` 获取汉字结构和目标字符范围**，重新生成参考字体覆盖的全部 Han 码位，并验证目标字体中的非 Han 字形和主要 OpenType 工程数据未被破坏。
+目前 Github 上几个类似的项目使用起来比较麻烦，对代码小白相当不友好，问过 ChatGPT 也看不懂如何运行，所以我让 GPT5.6-Sol Pro 帮我生成了这个项目。
+这个项目完全从头开始训练字体风格，经历多重工序，理论上可以做到开箱即用，运行脚本（虽然要花很长时间）即可直接生成符合对应地区字形、无需人工调整的 ttf 字体文件。
 
 ## 主要功能
 
@@ -35,13 +37,13 @@ Python 3.10-3.14 64 位
 
 ## 使用方法
 
-1. 解压到本地短路径，例如：
+1. 下载[本仓库源码](https://github.com/feiyangjun-1/HanziStyleForge-Fusion/archive/refs/heads/main.zip)解压到本地短路径，例如：
 
    ```text
    C:\FontWork\HanziStyleForge-Fusion
    ```
 
-2. 放入需要学习风格的 target 字体和字形参考 ref 字体：
+2. 放入需要学习风格的 target 字体和字形参考 ref 字体，必须将字体重命名为 target 和 ref：
 
    ```text
    fonts\target.ttf
@@ -55,11 +57,12 @@ Python 3.10-3.14 64 位
    install_cuda130.bat
    ```
 
-5. 检查环境、字体、覆盖范围、配置和数据流契约：
+5. 检查环境：
 
    ```text
    verify_project.bat
    ```
+   出现 successful 即可。
 
 6. 开始运行：
 
@@ -67,7 +70,7 @@ Python 3.10-3.14 64 位
    run_months_resilient.bat
    ```
 
-7. 查看目前状态：
+7. 查看目前状态（可选）：
 
    ```text
    run_status.bat
