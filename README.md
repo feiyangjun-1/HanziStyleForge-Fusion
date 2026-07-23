@@ -39,10 +39,10 @@ Python 3.10-3.14 64 位
 
 ## 使用方法
 
-1. 下载[本仓库源码](https://github.com/feiyangjun-1/HanziStyleForge-Fusion/archive/refs/heads/main.zip)解压到本地短路径，例如：
+1. 下载[本仓库源码](https://github.com/feiyangjun-1/HanziStyleForge-Fusion/archive/refs/heads/main.zip)解压到本地路径，例如：
 
    ```text
-   C:\FontWork\HanziStyleForge-Fusion
+   D:\HanziStyleForge-Fusion
    ```
 
 2. 放入需要学习风格的 target 字体和字形参考 ref 字体，必须将字体重命名为 target 和 ref：
@@ -84,13 +84,12 @@ Python 3.10-3.14 64 位
    request_safe_stop.bat
    ```
 
-9. 继续保存的进程
+9. 继续保存的进程，依次运行
     
    ```text
+   clear_safe_stop.bat
    run_months_resilient.bat
    ```
-
-  脚本会自动清除已经完成的停止请求。
 
 ## 正式配置
 
