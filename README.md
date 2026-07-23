@@ -193,4 +193,4 @@ HanziStyleForge Fusion 是独立实现。下列公开项目和论文为架构方
 
 ## 温馨提示
 
-本项目完全使用 GPT5.6-Sol Pro 生成，作者完全不懂代码。有问题可以直接把本项目链接发给 AI 服务提问。欢迎任何人 Pull request 对本项目改进。所有 pull request 也会由 GPT 进行审查。
+本项目完全使用 GPT5.6-Sol Pro 生成，作者完全不懂代码。有问题可以直接把本项目链接发给 AI 服务提问。欢迎任何人 Pull request 对本项目改进。所有 Pull requests 也会由 GPT 进行审查。
