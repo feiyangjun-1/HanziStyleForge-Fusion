@@ -24,7 +24,7 @@
 ```text
 Windows 11 64 位
 支持 CUDA 的 NVIDIA GPU
-Python 3.14 64 位或以上
+Python 3.10 64 位或以上
 至少 150GB 可用空间
 ```
 
