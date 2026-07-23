@@ -23,9 +23,8 @@
 
 ```text
 Windows 11 64 位
-12GB 或更高显存的 NVIDIA GPU
-Python 3.10-3.14 64 位
-本地 SSD
+支持 CUDA 的 NVIDIA GPU
+Python 3.14 64 位或以上
 至少 150GB 可用空间
 ```
 
@@ -95,6 +94,8 @@ Python 3.10-3.14 64 位
 
 主要配置文件：`config_fusion_months_12gb.json`。
 
+配置文件可根据自己的配置，把 json 文件发给 ChatGPT 或 Claude 等服务进行修改。
+
 当前 Style Encoder 默认值：
 
 ```json
@@ -110,7 +111,7 @@ Python 3.10-3.14 64 位
 }
 ```
 
-Style Encoder 支持质量门控早停：至少训练 100 个 epoch；之后若连续 24 个 epoch 没有显著验证改善，并且最近的正负风格相似度指标保持健康，就会自动结束。兼容的检查点和 `history.csv` 会直接复用。
+所有环节支持质量门控早停：至少训练一定数量 epoch；之后若连续 24 个 epoch 没有显著验证改善，并且最近的正负风格相似度指标保持健康，就会自动结束。兼容的检查点和 `history.csv` 会直接复用。
 
 除非准备丢弃当前阶段检查点，否则不要在阶段中途修改图像尺寸、模型通道数、风格维度、潜通道数或码本大小。
 
@@ -192,4 +193,4 @@ HanziStyleForge Fusion 是独立实现。下列公开项目和论文为架构方
 
 ## 温馨提示
 
-本项目完全使用 GPT5.6-Sol 生成，作者完全不懂代码。欢迎任何人 pull request 对本项目改进。所有 pull request 也会由 GPT 进行审查。
+本项目完全使用 GPT5.6-Sol Pro 生成，作者完全不懂代码。有问题可以直接把本项目链接发给 AI 服务提问。欢迎任何人 Pull request 对本项目改进。所有 pull request 也会由 GPT 进行审查。
