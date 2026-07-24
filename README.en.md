@@ -10,7 +10,7 @@ An experimental Windows-first Han font reconstruction tool. It learns style from
 
 - Learns global and local font style from `fonts/target.ttf`.
 - Rebuilds every Han character covered by the default glyphs in `refs/ref.otf`.
-- Accepts Mainland Chinese, Taiwan, Hong Kong, Japanese, Korean, inherited, or other reference glyph standards.
+- Accepts Chinese Mainland, Taiwan, Hong Kong, Japanese, Korean or other reference glyph standards.
 - Tries to preserve Latin letters, numbers, symbols, kana, Hangul, and major OpenType data from the target font.
 - Automates training, generation, candidate selection, QA, vectorization, and font building.
 
