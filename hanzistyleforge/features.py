@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image
 
 from .proxy import binary, thin_binary
+from .image_cache import invalidate as invalidate_image_cache, read_aux_rgba_u8, read_gray_u8, read_rgba_u8
 from .util import atomic_save_pil
 
 
@@ -136,18 +137,12 @@ def save_target_aux(path: str | Path, ink: np.ndarray, threshold: float = 0.5) -
         p,
         format="PNG",
     )
+    invalidate_image_cache(p)
 
 
 def read_target_aux(path: str | Path, size: int | None = None) -> np.ndarray:
     p = Path(path)
-    with Image.open(p) as image:
-        arr = np.asarray(image.convert("RGBA"), dtype=np.float32) / 255.0
-    if size is not None and arr.shape[:2] != (int(size), int(size)):
-        channels: list[np.ndarray] = []
-        for index in range(TARGET_AUX_CHANNELS):
-            interpolation = cv2.INTER_LINEAR if index != 2 else cv2.INTER_AREA
-            channels.append(cv2.resize(arr[..., index], (int(size), int(size)), interpolation=interpolation))
-        arr = np.stack(channels, axis=-1)
+    arr = np.asarray(read_aux_rgba_u8(p, size=None if size is None else int(size)), dtype=np.float32) / 255.0
     return arr.clip(0.0, 1.0).astype(np.float32)
 
 
@@ -155,8 +150,7 @@ def target_aux_from_path(target_path: str | Path, aux_path: str | Path, size: in
     aux = Path(aux_path) if str(aux_path) else Path()
     if str(aux_path) and aux.is_file():
         return read_target_aux(aux, size=size)
-    with Image.open(target_path) as image:
-        gray = np.asarray(image.convert("L"), dtype=np.float32) / 255.0
+    gray = np.asarray(read_gray_u8(target_path), dtype=np.float32) / 255.0
     ink = 1.0 - gray
     if ink.shape != (int(size), int(size)):
         ink = cv2.resize(ink, (int(size), int(size)), interpolation=cv2.INTER_AREA)

@@ -6,13 +6,14 @@ from typing import Any
 from .util import absolute_from, deep_merge, load_json, save_json
 
 
-CHECKPOINT_FORMAT_VERSION = 300
+CHECKPOINT_FORMAT_VERSION = 301
 
 
 DEFAULT_CONFIG: dict[str, Any] = {
     "version": CHECKPOINT_FORMAT_VERSION,
     "runtime": {
         "prevent_system_sleep": True,
+        "durable_image_writes": False,
         "thermal_guard": {
             "enabled": True,
             "pause_above_c": 88,
@@ -126,18 +127,20 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "device": "cuda",
         "amp": True,
         "workers": 4,
-        "cpu_threads": 4,
+        "cpu_threads": 6,
         "interop_threads": 1,
         "opencv_threads": 1,
+        "image_cache_mb_per_process": 192,
+        "prefetch_factor": 4,
         "validation_ratio": 0.06,
         "base_channels": 36,
         "weight_decay": 8e-05,
         "gradient_clip": 0.8,
         "ema_decay": 0.9995,
         "preview_every": 2,
-        "checkpoint_every_steps": 150,
+        "checkpoint_every_steps": 400,
         "resume_if_exists": True,
-        "reset_incompatible_checkpoints": False,
+        "reset_incompatible_checkpoints": True,
         "balanced_sampling": True,
         "samples_per_epoch": 0,
         "phases": [
@@ -211,6 +214,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "fusion_neural_weight": 0.64,
         "fusion_retrieval_weight": 0.36,
         "save_all_family_candidates": False,
+            "progress_checkpoint_interval": 32,
         "resume_interval": 1,
     },
     "marathon": {
@@ -238,11 +242,11 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "refine": {
             "enabled": True,
             "analysis_size": 192,
-            "passes": 6,
-            "global_search_trials": 1200,
-            "local_sweeps": 8,
+            "passes": 2,
+            "global_search_trials": 96,
+            "local_sweeps": 3,
             "zone_grid": 3,
-            "save_every_glyphs": 1,
+            "save_every_glyphs": 16,
             "maximum_glyphs": 0,
             "use_component_layout": True,
             "decomposition_file": "data/cjkvi-ids/ids.txt",
@@ -252,7 +256,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "region_priority": [],
             "include_obsolete": False,
             "component_depth": 3,
-            "maximum_component_zones": 48,
+            "maximum_component_zones": 24,
         },
     },
     "fusion": {
@@ -260,7 +264,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "style_dim": 256,
         "expert_count": 8,
         "latent_channels": 32,
-        "vq_embeddings": 1536,
+        "vq_embeddings": 512,
         "diffusion_steps": 1000,
         "style_encoder": {
             "size": 128,
@@ -294,10 +298,10 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "weight_decay": 0.00008,
             "preview_every": 4,
             "checkpoint_every_steps": 240,
-            "validation_batches": 64,
+            "validation_batches": 32,
             "loss_profile": "fast_balanced_v1",
             "channels_last": True,
-            "fused_optimizer": True,
+            "fused_optimizer": False,
             "loss_weights": {
                 "bce": 0.28, "dice": 0.26, "multiscale": 0.08,
                 "projection": 0.06, "sdf": 0.15,
@@ -335,7 +339,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "min_snr_gamma": 5.0,
             "gradient_clip": 1.0,
             "reconstruction_timestep_limit": 240,
-            "validation_batches": 96,
+            "validation_batches": 24,
             "preview_every": 4,
             "checkpoint_every_steps": 100,
             "image_loss_weights": {
@@ -377,7 +381,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "learning_rate": 0.000022,
             "ema_decay": 0.9997,
             "style_weight": 0.20,
-            "validation_batches": 96,
+            "validation_batches": 24,
             "preview_every": 4,
             "checkpoint_every_steps": 100,
             "lr_patience": 10,
@@ -422,8 +426,9 @@ DEFAULT_CONFIG: dict[str, Any] = {
         },
         "inference": {
             "size": 512,
-            "diffusion_seeds": 7,
-            "ddim_steps": 112,
+            "diffusion_seeds": 3,
+            "ddim_steps": 48,
+            "seed_batch_size": 2,
             "ddim_eta": 0.0,
             "guidance_scale": 1.22,
             "snap_to_codebook": True,
@@ -448,12 +453,12 @@ DEFAULT_CONFIG: dict[str, Any] = {
     "qa": {"contact_sheet_count": 960},
     "build": {
         "outline_mode": "sdf_quadratic",
-        "sdf_upsample": 6,
+        "sdf_upsample": 4,
         "sdf_sigma": 0.46,
         "sdf_levels": [0.0, -0.06, 0.06, -0.12, 0.12, -0.20, 0.20, -0.28, 0.28],
         "curve_simplify": 0.48,
         "corner_angle_degrees": 100.0,
-        "maximum_points_per_contour": 640,
+        "maximum_points_per_contour": 480,
         "family_suffix": " HanziStyleForge Fusion",
         "postscript_suffix": "HanziStyleForgeFusion",
         "replace_strategy": "new_glyph_and_remap",

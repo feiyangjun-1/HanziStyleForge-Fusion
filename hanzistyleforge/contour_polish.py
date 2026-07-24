@@ -14,6 +14,7 @@ from PIL import Image
 from torch.utils.data import Dataset
 
 from .fusion_model import ContourSequenceTransformer
+from .image_cache import read_gray_u8
 from .util import ensure_dir, read_csv, save_json, sha256_file
 
 
@@ -123,8 +124,7 @@ def build_contour_cache(cfg: dict[str, Any], *, force: bool = False) -> dict[str
     stored_cps: list[int] = []
     seen = 0
     for row in rows:
-        with Image.open(row["target_path"]) as image:
-            gray = np.asarray(image.convert("L"), dtype=np.float32) / 255.0
+        gray = np.asarray(read_gray_u8(row["target_path"]), dtype=np.float32) / 255.0
         ink = 1.0 - gray
         for contour in extract_contours_from_ink(ink, minimum_area=max(3.0, ink.shape[0] * ink.shape[1] * 0.000015)):
             sampled = resample_closed_contour(contour, point_count)
@@ -145,7 +145,7 @@ def build_contour_cache(cfg: dict[str, Any], *, force: bool = False) -> dict[str
         summary = {"enabled": False, "reason": f"only {len(stored)} target contours"}
         save_json(summary_path, summary)
         return summary
-    np.savez_compressed(
+    np.savez(
         cache_path,
         points=np.stack(stored).astype(np.float16),
         corners=np.stack(stored_corners).astype(np.uint8),

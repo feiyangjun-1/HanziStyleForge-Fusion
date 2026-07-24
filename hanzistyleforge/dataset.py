@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+import os
 import random
 from pathlib import Path
 from typing import Any
@@ -12,6 +13,7 @@ from PIL import Image
 from torch.utils.data import DataLoader, Dataset, WeightedRandomSampler
 
 from .features import expand_proxy_channels, target_aux_from_path
+from .image_cache import read_rgba_u8
 from .util import read_csv
 
 
@@ -32,18 +34,13 @@ def _loader_options(workers: int, pin_memory: bool) -> dict[str, Any]:
         "persistent_workers": bool(worker_count > 0),
     }
     if worker_count > 0:
-        options["prefetch_factor"] = 3
+        options["prefetch_factor"] = max(2, int(os.environ.get("HSF_PREFETCH_FACTOR", "4")))
         options["worker_init_fn"] = _seed_loader_worker
     return options
 
 
 def _read_proxy4(path: str | Path, size: int) -> np.ndarray:
-    with Image.open(path) as image:
-        arr = np.asarray(image.convert("RGBA"), dtype=np.float32) / 255.0
-    if arr.shape[0] != size or arr.shape[1] != size:
-        channels = [cv2.resize(arr[..., i], (size, size), interpolation=cv2.INTER_AREA) for i in range(4)]
-        arr = np.stack(channels, axis=-1)
-    return arr.clip(0.0, 1.0)
+    return (np.asarray(read_rgba_u8(path, size=int(size)), dtype=np.float32) / 255.0).clip(0.0, 1.0)
 
 
 def _joint_affine(proxy: np.ndarray, target_aux: np.ndarray) -> tuple[np.ndarray, np.ndarray]:

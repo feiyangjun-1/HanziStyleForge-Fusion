@@ -19,6 +19,7 @@ from .contract import validate_data_flow_contract
 from .dataset import expand_proxy_channels
 from .decomposition import load_decompositions
 from .ids_data import IDSDataError, ensure_decomposition_data
+from .image_cache import read_rgba_u8
 from .features import split_prediction
 from .fusion_diffusion import DiffusionSchedule, classifier_free_guidance_sample
 from .fusion_training import (
@@ -95,13 +96,7 @@ def _autocast(device: torch.device, enabled: bool):
 
 
 def _read_proxy10(path: str | Path, size: int) -> np.ndarray:
-    with Image.open(path) as image:
-        proxy4 = np.asarray(image.convert("RGBA"), dtype=np.float32) / 255.0
-    if proxy4.shape[:2] != (size, size):
-        proxy4 = np.stack(
-            [cv2.resize(proxy4[..., channel], (size, size), interpolation=cv2.INTER_AREA) for channel in range(4)],
-            axis=-1,
-        )
+    proxy4 = np.asarray(read_rgba_u8(path, size=int(size)), dtype=np.float32) / 255.0
     return expand_proxy_channels(proxy4.clip(0.0, 1.0)).astype(np.float32)
 
 
@@ -155,12 +150,14 @@ def _diffusion_probabilities(
     target_radius: float,
     profile_size: int,
 ) -> tuple[list[np.ndarray], list[np.ndarray | None], list[np.ndarray | None], dict[str, Any]]:
+    del target_radius, profile_size
     fusion_cfg = cfg.get("fusion", {})
     inference_cfg = fusion_cfg.get("inference", {})
     device = proxy_tensor.device
     amp = bool(cfg.get("training", {}).get("amp", True) and device.type == "cuda")
-    seeds = max(1, int(inference_cfg.get("diffusion_seeds", 6)))
-    steps = max(8, int(inference_cfg.get("ddim_steps", 96)))
+    seeds = max(1, int(inference_cfg.get("diffusion_seeds", 3)))
+    steps = max(8, int(inference_cfg.get("ddim_steps", 48)))
+    seed_batch_size = max(1, min(seeds, int(inference_cfg.get("seed_batch_size", 2))))
     guidance = float(inference_cfg.get("guidance_scale", 1.20))
     eta = float(inference_cfg.get("ddim_eta", 0.0))
     style_values = _style_variants(style_bank, seeds, codepoint * 104729 + 17, device)
@@ -170,42 +167,52 @@ def _diffusion_probabilities(
     probabilities: list[np.ndarray] = []
     sdf_values: list[np.ndarray | None] = []
     skeleton_values: list[np.ndarray | None] = []
-    null_style = torch.zeros_like(style_values[0])
-    for local in range(seeds):
-        generator = torch.Generator(device=device)
-        generator.manual_seed(int(codepoint) * 1000003 + local * 104729 + int(cfg.get("training", {}).get("seed", 0)))
+    base_seed = int(cfg.get("training", {}).get("seed", 0))
+    for first in range(0, seeds, seed_batch_size):
+        count = min(seed_batch_size, seeds - first)
+        styles = torch.cat(style_values[first:first + count], dim=0)
+        content = proxy_tensor.expand(count, -1, -1, -1)
+        noises: list[torch.Tensor] = []
+        for local in range(first, first + count):
+            generator = torch.Generator(device=device)
+            generator.manual_seed(int(codepoint) * 1000003 + local * 104729 + base_seed)
+            noises.append(torch.randn((1, latent_channels, latent_h, latent_w), device=device, generator=generator))
+        initial_noise = torch.cat(noises, dim=0)
+        null_style = torch.zeros_like(styles)
         with torch.no_grad(), _autocast(device, amp):
             latent = classifier_free_guidance_sample(
                 diffusion,
                 schedule,
-                (1, latent_channels, latent_h, latent_w),
-                content_proxy=proxy_tensor,
-                style_experts=style_values[local],
+                tuple(initial_noise.shape),
+                content_proxy=content,
+                style_experts=styles,
                 null_style_experts=null_style,
                 guidance_scale=guidance,
                 steps=steps,
                 eta=eta,
-                generator=generator,
+                initial_noise=initial_noise,
             )
             decoded = vq.decode(latent, snap_to_codebook=bool(inference_cfg.get("snap_to_codebook", True)))
             ink = torch.sigmoid(decoded[:, :1])
             sdf = torch.sigmoid(decoded[:, 1:2]) if decoded.shape[1] > 1 else None
             skeleton = torch.sigmoid(decoded[:, 2:3]) if decoded.shape[1] > 2 else None
             if ink.shape[-2:] != proxy_tensor.shape[-2:]:
-                ink = torch.nn.functional.interpolate(ink, size=proxy_tensor.shape[-2:], mode="bilinear", align_corners=False)
+                size = proxy_tensor.shape[-2:]
+                ink = torch.nn.functional.interpolate(ink, size=size, mode="bilinear", align_corners=False)
                 if sdf is not None:
-                    sdf = torch.nn.functional.interpolate(sdf, size=proxy_tensor.shape[-2:], mode="bilinear", align_corners=False)
+                    sdf = torch.nn.functional.interpolate(sdf, size=size, mode="bilinear", align_corners=False)
                 if skeleton is not None:
-                    skeleton = torch.nn.functional.interpolate(skeleton, size=proxy_tensor.shape[-2:], mode="bilinear", align_corners=False)
+                    skeleton = torch.nn.functional.interpolate(skeleton, size=size, mode="bilinear", align_corners=False)
             if refiner is not None:
-                refined_logits = refiner(torch.cat([ink, proxy_tensor], dim=1), style_values[local])
-                ink = torch.sigmoid(refined_logits)
-        probabilities.append(ink[0, 0].float().cpu().numpy().clip(0.0, 1.0))
-        sdf_values.append(None if sdf is None else sdf[0, 0].float().cpu().numpy().clip(0.0, 1.0))
-        skeleton_values.append(None if skeleton is None else skeleton[0, 0].float().cpu().numpy().clip(0.0, 1.0))
+                ink = torch.sigmoid(refiner(torch.cat([ink, content], dim=1), styles))
+        for item in range(count):
+            probabilities.append(ink[item, 0].float().cpu().numpy().clip(0.0, 1.0))
+            sdf_values.append(None if sdf is None else sdf[item, 0].float().cpu().numpy().clip(0.0, 1.0))
+            skeleton_values.append(None if skeleton is None else skeleton[item, 0].float().cpu().numpy().clip(0.0, 1.0))
     stack = np.stack(probabilities, axis=0)
     metadata = {
         "seed_count": seeds,
+        "seed_batch_size": seed_batch_size,
         "steps": steps,
         "mean_disagreement": float(stack.std(axis=0).mean()),
         "maximum_disagreement": float(stack.std(axis=0).max()),
@@ -394,9 +401,11 @@ def generate_fusion_and_select(cfg: dict[str, Any], *, output_subdir: str = "gen
         direct_threshold = float(load_json(calibration).get("threshold", 0.5))
     diffusion_threshold = float(fusion_inf.get("threshold", 0.5))
     save_all = bool(fusion_inf.get("save_all_family_candidates", False))
+    progress_interval = max(1, int(fusion_inf.get("progress_checkpoint_interval", 32)))
     processed = {int(row["codepoint"]) for row in selection_rows}
     guard = LongRunGuard(cfg)
     progress = tqdm(total=len(rows), initial=len(selection_rows), desc="HanziStyleForge Fusion full generation", unit="glyph")
+    completed_since_checkpoint = 0
 
     try:
         for row in rows:
@@ -651,12 +660,16 @@ def generate_fusion_and_select(cfg: dict[str, Any], *, output_subdir: str = "gen
                 selection_rows.append(result)
             processed.add(cp)
             progress.update(1)
-            _write_partial(partial_path, state_path, selection_rows, fingerprint, len(rows))
-            guard.checkpoint_boundary()
+            completed_since_checkpoint += 1
+            if completed_since_checkpoint >= progress_interval:
+                _write_partial(partial_path, state_path, selection_rows, fingerprint, len(rows))
+                guard.checkpoint_boundary()
+                completed_since_checkpoint = 0
     finally:
         progress.close()
         if selection_rows and len(selection_rows) < len(rows):
             _write_partial(partial_path, state_path, selection_rows, fingerprint, len(rows))
+            guard.checkpoint_boundary()
 
     selected_by_cp = {int(row["codepoint"]): row for row in selection_rows}
     missing = sorted(set(by_cp) - set(selected_by_cp))

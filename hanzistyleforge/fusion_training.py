@@ -5,6 +5,7 @@ import copy
 import csv
 import json
 import math
+import os
 import random
 import shutil
 import time
@@ -56,7 +57,7 @@ from .util import (
 )
 
 
-FUSION_CHECKPOINT_VERSION = 300
+FUSION_CHECKPOINT_VERSION = 301
 
 
 def _device(cfg: dict[str, Any]) -> torch.device:
@@ -70,6 +71,16 @@ def _autocast(device: torch.device, enabled: bool):
     if enabled and device.type == "cuda":
         return torch.autocast(device_type="cuda", dtype=torch.float16)
     return contextlib.nullcontext()
+
+
+def _efficient_glyph_criterion(section: dict[str, Any], fallback_weights: dict[str, Any]) -> nn.Module:
+    profile = str(section.get("loss_profile", "fast_balanced_v1")).strip().lower()
+    weights = section.get("image_loss_weights", section.get("loss_weights", fallback_weights))
+    if profile == "legacy_full_v1":
+        return FontLossFinal(weights)
+    if profile == "fast_balanced_v1":
+        return VQReconstructionLoss(weights)
+    raise ValueError(f"unsupported glyph loss profile: {profile}")
 
 
 def _scaler(device: torch.device, enabled: bool):
@@ -283,7 +294,7 @@ def _loader(dataset, batch_size: int, workers: int, *, shuffle: bool = True) -> 
         # Three prefetched batches per worker keeps the GPU fed without the
         # excessive RAM growth seen with much deeper queues.  The worker
         # callback is module-level and therefore safe with Windows spawn.
-        options["prefetch_factor"] = 3
+        options["prefetch_factor"] = max(2, int(os.environ.get("HSF_PREFETCH_FACTOR", "4")))
         options["worker_init_fn"] = _seed_loader_worker
     return DataLoader(dataset, **options)
 
@@ -733,6 +744,26 @@ def load_style_bank(cfg: dict[str, Any], device: torch.device | str) -> dict[str
     return {key: value.to(device) if isinstance(value, torch.Tensor) else value for key, value in payload.items()}
 
 
+def _style_experts_from_bank(
+    batch: dict[str, Any],
+    style_bank: dict[str, Any],
+    device: torch.device,
+    batch_size: int,
+) -> torch.Tensor:
+    groups = style_bank.get("experts")
+    if not isinstance(groups, torch.Tensor) or groups.ndim != 3 or groups.shape[0] == 0:
+        mean = style_bank["mean_experts"].to(device, non_blocking=True)
+        return mean.unsqueeze(0).expand(int(batch_size), -1, -1)
+    groups = groups.to(device, non_blocking=True)
+    indexes = batch.get("style_index")
+    if isinstance(indexes, torch.Tensor):
+        indexes = indexes.to(device=device, dtype=torch.long, non_blocking=True).reshape(-1)
+        indexes = torch.remainder(indexes, groups.shape[0])
+    else:
+        indexes = torch.arange(int(batch_size), device=device, dtype=torch.long) % groups.shape[0]
+    return groups.index_select(0, indexes)
+
+
 def _vq_model(cfg: dict[str, Any]) -> GlyphVQVAE:
     fusion = cfg.get("fusion", {})
     vq = fusion.get("vq", {})
@@ -856,6 +887,24 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
         checkpoint_every = max(20, int(vq_cfg.get("checkpoint_every_steps", 240)))
         validation_batches = max(0, int(vq_cfg.get("validation_batches", 64)))
 
+        # Every VQ resolution uses significant-improvement early stopping.
+        # Per-phase values override the shared defaults.
+        shared_early_cfg = vq_cfg.get("early_stopping", {})
+        early_cfg = {**shared_early_cfg, **phase.get("early_stopping", {})}
+        early_enabled = bool(early_cfg.get("enabled", True))
+        early_minimum_epochs = max(1, int(early_cfg.get("minimum_epochs", 24)))
+        early_patience = max(1, int(early_cfg.get("patience", phase.get("patience", 12))))
+        early_relative_improvement = max(
+            0.0, float(early_cfg.get("minimum_relative_improvement", 0.001))
+        )
+        significant_best, last_significant_epoch, stale_epochs = _style_plateau_state(
+            history,
+            through_epoch=start_epoch - 1,
+            minimum_relative_improvement=early_relative_improvement,
+        )
+        early_stopped = False
+        stop_reason = "maximum_epochs"
+
         @torch.no_grad()
         def evaluate() -> dict[str, float]:
             model.eval()
@@ -885,7 +934,36 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
                 "perplexity": total_perplexity / max(1, seen),
             }
 
-        for epoch in range(start_epoch, int(phase["epochs"]) + 1):
+        completed_before_resume = start_epoch - 1
+        if (
+            early_enabled
+            and completed_before_resume >= early_minimum_epochs
+            and stale_epochs >= early_patience
+        ):
+            early_stopped = True
+            stop_reason = "significant_validation_plateau"
+            save_json(phase_dir / "EARLY_STOP.json", {
+                "stage": str(phase["name"]),
+                "reason": stop_reason,
+                "epoch": completed_before_resume,
+                "maximum_epochs": int(phase["epochs"]),
+                "stale_epochs": stale_epochs,
+                "last_significant_epoch": last_significant_epoch,
+                "significant_best_validation_loss": significant_best,
+                "raw_best_validation_loss": best,
+                "minimum_relative_improvement": early_relative_improvement,
+                "patience": early_patience,
+                "minimum_epochs": early_minimum_epochs,
+            })
+            print(
+                f"{phase['name']} early stopping: validation has reached a significant-improvement plateau, "
+                f"epoch={completed_before_resume}, stale={stale_epochs}."
+            )
+            epoch_range: Iterable[int] = ()
+        else:
+            epoch_range = range(start_epoch, int(phase["epochs"]) + 1)
+
+        for epoch in epoch_range:
             model.train()
             optimizer.zero_grad(set_to_none=True)
             totals = 0.0
@@ -916,6 +994,9 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
                             "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(),
                             "scaler": scaler.state_dict(), "epoch": epoch - 1, "global_step": global_step,
                             "best": best, "no_improvement": no_improvement, "model_spec": model_spec,
+                            "significant_best": significant_best,
+                            "last_significant_epoch": last_significant_epoch,
+                            "stale_epochs": stale_epochs,
                             "loss_profile": loss_profile, "channels_last": channels_last,
                             "optimizer_backend": "fused" if fused_optimizer else "standard",
                         }, phase_dir / "in_epoch.pt")
@@ -932,11 +1013,21 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
                 no_improvement = 0
             else:
                 no_improvement += 1
+            significant_threshold = significant_best * (1.0 - early_relative_improvement)
+            if not math.isfinite(significant_best) or validation["loss"] < significant_threshold:
+                significant_best = validation["loss"]
+                last_significant_epoch = epoch
+                stale_epochs = 0
+            else:
+                stale_epochs = max(0, epoch - last_significant_epoch)
             payload = {
                 "fingerprint": fingerprint, "model": model.state_dict(),
                 "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(),
                 "scaler": scaler.state_dict(), "epoch": epoch, "global_step": global_step,
                 "best": best, "no_improvement": no_improvement, "model_spec": model_spec,
+                "significant_best": significant_best,
+                "last_significant_epoch": last_significant_epoch,
+                "stale_epochs": stale_epochs,
                 "validation": validation, "loss_profile": loss_profile,
                 "channels_last": channels_last,
                 "optimizer_backend": "fused" if fused_optimizer else "standard",
@@ -950,6 +1041,8 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
                 "val_loss": validation["loss"], "val_dice": validation["dice"],
                 "val_perplexity": validation["perplexity"],
                 "learning_rate": optimizer.param_groups[0]["lr"], "best": int(improved),
+                "early_stop_stale_epochs": stale_epochs,
+                "early_stop_significant_best": significant_best,
             })
             _write_history(phase_dir / "history.csv", history)
             if epoch == 1 or epoch % int(vq_cfg.get("preview_every", 4)) == 0 or improved:
@@ -967,13 +1060,54 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
                     [int(value) for value in batch["codepoint"]],
                 )
             guard.checkpoint_boundary()
-            if no_improvement >= int(phase.get("patience", 36)):
+            if (
+                early_enabled
+                and epoch >= early_minimum_epochs
+                and stale_epochs >= early_patience
+            ):
+                early_stopped = True
+                stop_reason = "significant_validation_plateau"
+                save_json(phase_dir / "EARLY_STOP.json", {
+                    "stage": str(phase["name"]),
+                    "reason": stop_reason,
+                    "epoch": epoch,
+                    "maximum_epochs": int(phase["epochs"]),
+                    "stale_epochs": stale_epochs,
+                    "last_significant_epoch": last_significant_epoch,
+                    "significant_best_validation_loss": significant_best,
+                    "raw_best_validation_loss": best,
+                    "minimum_relative_improvement": early_relative_improvement,
+                    "patience": early_patience,
+                    "minimum_epochs": early_minimum_epochs,
+                })
+                print(
+                    f"{phase['name']} early stopping: validation has reached a significant-improvement plateau, "
+                    f"epoch={epoch}, stale={stale_epochs}."
+                )
                 break
-        save_json(phase_dir / "completed.json", {"fingerprint": fingerprint, "best": best})
+            if not early_enabled and no_improvement >= int(phase.get("patience", 36)):
+                stop_reason = "raw_validation_plateau"
+                break
+        save_json(phase_dir / "completed.json", {
+            "fingerprint": fingerprint,
+            "best": best,
+            "early_stopped": early_stopped,
+            "stop_reason": stop_reason,
+            "significant_best": significant_best,
+            "last_significant_epoch": last_significant_epoch,
+            "stale_epochs": stale_epochs,
+        })
         previous_best = phase_dir / "best.pt"
         best_payload = torch.load(previous_best, map_location=device, weights_only=False)
         model.load_state_dict(best_payload["model"], strict=True)
-        phase_results.append({"name": phase["name"], "checkpoint": str(previous_best.resolve()), "best": best})
+        phase_results.append({
+            "name": phase["name"],
+            "checkpoint": str(previous_best.resolve()),
+            "best": best,
+            "early_stopped": early_stopped,
+            "stop_reason": stop_reason,
+            "stale_epochs": stale_epochs,
+        })
 
     assert previous_best is not None
     final_path = root / "vq_best.pt"
@@ -1047,8 +1181,9 @@ def _diffusion_training_loss(
     model: LatentDiffusionUNet,
     vq: GlyphVQVAE,
     style_encoder: StyleReferenceEncoder,
+    style_bank: dict[str, Any],
     schedule: DiffusionSchedule,
-    criterion: FontLossFinal,
+    criterion: nn.Module,
     batch: dict[str, torch.Tensor],
     device: torch.device,
     cfg: dict[str, Any],
@@ -1057,11 +1192,9 @@ def _diffusion_training_loss(
     diffusion_cfg = cfg.get("fusion", {}).get("diffusion", {})
     proxy = batch["proxy"].to(device, non_blocking=True)
     target_aux = batch["target_aux"].to(device, non_blocking=True)
-    style_refs = batch["style_refs"].to(device, non_blocking=True)
     with torch.no_grad():
         target_latent = vq.encode(target_aux, quantize=True, update_codebook=False)["quantized"]
-        style_output = style_encoder(style_refs)
-        experts = style_output["experts"]
+        experts = _style_experts_from_bank(batch, style_bank, device, target_aux.shape[0])
     if model.training and random.random() < float(diffusion_cfg.get("style_dropout", 0.08)):
         experts = torch.zeros_like(experts)
     recon_limit = int(diffusion_cfg.get("reconstruction_timestep_limit", 300))
@@ -1136,6 +1269,7 @@ def _evaluate_diffusion(
     model: LatentDiffusionUNet,
     vq: GlyphVQVAE,
     style_encoder: StyleReferenceEncoder,
+    style_bank: dict[str, Any],
     schedule: DiffusionSchedule,
     loader: Iterable,
     device: torch.device,
@@ -1144,7 +1278,7 @@ def _evaluate_diffusion(
     maximum_batches: int = 96,
 ) -> dict[str, float]:
     model.eval()
-    criterion = FontLossFinal(cfg.get("fusion", {}).get("diffusion", {}).get("image_loss_weights", cfg.get("loss", {}).get("weights", {}))).to(device)
+    criterion = _efficient_glyph_criterion(cfg.get("fusion", {}).get("diffusion", {}), cfg.get("loss", {}).get("weights", {})).to(device)
     totals: dict[str, float] = {}
     seen = 0
     rng_state = torch.random.get_rng_state()
@@ -1155,7 +1289,7 @@ def _evaluate_diffusion(
                 break
             with _autocast(device, amp):
                 loss, pieces = _diffusion_training_loss(
-                    model=model, vq=vq, style_encoder=style_encoder, schedule=schedule,
+                    model=model, vq=vq, style_encoder=style_encoder, style_bank=style_bank, schedule=schedule,
                     criterion=criterion, batch=batch, device=device, cfg=cfg, amp=amp,
                 )
             count = int(batch["proxy"].shape[0])
@@ -1174,6 +1308,7 @@ def _diffusion_preview(
     model: LatentDiffusionUNet,
     vq: GlyphVQVAE,
     style_encoder: StyleReferenceEncoder,
+    style_bank: dict[str, Any],
     schedule: DiffusionSchedule,
     loader: Iterable,
     device: torch.device,
@@ -1184,12 +1319,13 @@ def _diffusion_preview(
     batch = next(iter(loader))
     proxy = batch["proxy"].to(device)
     target_aux = batch["target_aux"].to(device)
-    refs = batch["style_refs"].to(device)
     count = min(6, proxy.shape[0])
     proxy = proxy[:count]
     target_aux = target_aux[:count]
-    refs = refs[:count]
-    experts = style_encoder(refs)["experts"]
+    preview_batch = dict(batch)
+    if isinstance(preview_batch.get("style_index"), torch.Tensor):
+        preview_batch["style_index"] = preview_batch["style_index"][:count]
+    experts = _style_experts_from_bank(preview_batch, style_bank, device, count)
     latent_height = max(1, proxy.shape[-2] // 8)
     latent_width = max(1, proxy.shape[-1] // 8)
     generator = torch.Generator(device=device).manual_seed(20260719)
@@ -1305,6 +1441,7 @@ def _train_diffusion_phase(
     model: LatentDiffusionUNet,
     vq: GlyphVQVAE,
     style_encoder: StyleReferenceEncoder,
+    style_bank: dict[str, Any],
     schedule: DiffusionSchedule,
     init_checkpoint: Path | None,
     hard_codepoints: set[int] | None = None,
@@ -1376,17 +1513,17 @@ def _train_diffusion_phase(
     style_refs = int(cfg["fusion"].get("style_encoder", {}).get("inference_references", 12))
     train_dataset = FusionDiffusionDataset(
         index_path, split="train", size=size, style_size=style_size, style_references=style_refs,
-        augment=True, hard_codepoints=hard_codepoints,
+        style_groups=int(style_bank.get("group_count", 12)), augment=True, hard_codepoints=hard_codepoints,
         hard_repeat=int(phase.get("hard_repeat", 5)),
         seed=int(cfg["training"].get("seed", 20260719)) + int(phase.get("seed_offset", 0)),
     )
     val_dataset = FusionDiffusionDataset(
         index_path, split="val", size=size, style_size=style_size, style_references=style_refs,
-        augment=False, seed=int(cfg["training"].get("seed", 20260719)) + 8081,
+        style_groups=int(style_bank.get("group_count", 12)), augment=False, seed=int(cfg["training"].get("seed", 20260719)) + 8081,
     )
     train_loader = _loader(train_dataset, int(phase["batch_size"]), workers, shuffle=True)
     val_loader = _loader(val_dataset, max(1, int(phase["batch_size"])), workers, shuffle=False)
-    criterion = FontLossFinal(diffusion_cfg.get("image_loss_weights", cfg.get("loss", {}).get("weights", {}))).to(device)
+    criterion = _efficient_glyph_criterion(diffusion_cfg, cfg.get("loss", {}).get("weights", {})).to(device)
     accumulation = max(1, int(phase.get("gradient_accumulation", 1)))
     history = _read_history(phase_dir / "history.csv")
     checkpoint_every = max(20, int(diffusion_cfg.get("checkpoint_every_steps", 120)))
@@ -1401,7 +1538,7 @@ def _train_diffusion_phase(
         for step, batch in enumerate(progress, start=1):
             with _autocast(device, amp):
                 loss, pieces = _diffusion_training_loss(
-                    model=model, vq=vq, style_encoder=style_encoder, schedule=schedule,
+                    model=model, vq=vq, style_encoder=style_encoder, style_bank=style_bank, schedule=schedule,
                     criterion=criterion, batch=batch, device=device, cfg=cfg, amp=amp,
                 )
                 scaled = loss / accumulation
@@ -1428,14 +1565,12 @@ def _train_diffusion_phase(
             for key, value in pieces.items():
                 totals[key] = totals.get(key, 0.0) + float(value.item()) * count
             progress.set_postfix(loss=f"{totals['loss']/max(1,seen):.4f}", lr=f"{optimizer.param_groups[0]['lr']:.2e}")
-        evaluation_model = copy.deepcopy(model).to(device)
-        ema.copy_to(evaluation_model)
-        validation = _evaluate_diffusion(
-            model=evaluation_model, vq=vq, style_encoder=style_encoder, schedule=schedule,
-            loader=val_loader, device=device, cfg=cfg, amp=amp,
-            maximum_batches=int(diffusion_cfg.get("validation_batches", 96)),
-        )
-        del evaluation_model
+        with ema.average_parameters(model):
+            validation = _evaluate_diffusion(
+                model=model, vq=vq, style_encoder=style_encoder, style_bank=style_bank, schedule=schedule,
+                loader=val_loader, device=device, cfg=cfg, amp=amp,
+                maximum_batches=int(diffusion_cfg.get("validation_batches", 96)),
+            )
         _enforce_diffusion_style_guard(cfg, phase, epoch, validation, phase_dir)
         scheduler_lr.step(validation["loss"])
         improved = validation["loss"] < best - float(phase.get("minimum_improvement", 1e-5))
@@ -1468,14 +1603,12 @@ def _train_diffusion_phase(
         })
         _write_history(phase_dir / "history.csv", history)
         if epoch == 1 or epoch % int(diffusion_cfg.get("preview_every", 4)) == 0 or improved:
-            preview_model = copy.deepcopy(model).to(device)
-            ema.copy_to(preview_model)
-            _diffusion_preview(
-                model=preview_model, vq=vq, style_encoder=style_encoder, schedule=schedule,
-                loader=val_loader, device=device, cfg=cfg,
-                output=phase_dir / "previews" / f"epoch_{epoch:03d}.png",
-            )
-            del preview_model
+            with ema.average_parameters(model):
+                _diffusion_preview(
+                    model=model, vq=vq, style_encoder=style_encoder, style_bank=style_bank, schedule=schedule,
+                    loader=val_loader, device=device, cfg=cfg,
+                    output=phase_dir / "previews" / f"epoch_{epoch:03d}.png",
+                )
         guard.checkpoint_boundary()
         if no_improvement >= int(phase.get("patience", 48)):
             break
@@ -1502,6 +1635,7 @@ def mine_hard_codepoints(
     model: LatentDiffusionUNet,
     vq: GlyphVQVAE,
     style_encoder: StyleReferenceEncoder,
+    style_bank: dict[str, Any],
     schedule: DiffusionSchedule,
     *,
     maximum: int,
@@ -1514,7 +1648,7 @@ def mine_hard_codepoints(
     style_refs = int(cfg["fusion"].get("style_encoder", {}).get("inference_references", 12))
     dataset = FusionDiffusionDataset(
         index_path, split="train", size=evaluation_size, style_size=style_size,
-        style_references=style_refs, augment=False,
+        style_references=style_refs, style_groups=int(style_bank.get("group_count", 12)), augment=False,
         seed=int(cfg["training"].get("seed", 20260719)) + 4567,
     )
     loader = _loader(dataset, 1, int(cfg["training"].get("workers", 0)), shuffle=False)
@@ -1524,13 +1658,12 @@ def mine_hard_codepoints(
     for batch in tqdm(loader, desc="Mining hard diffusion glyphs", unit="glyph"):
         proxy = batch["proxy"].to(device)
         target_aux = batch["target_aux"].to(device)
-        refs = batch["style_refs"].to(device)
         target_latent = vq.encode(target_aux, quantize=True, update_codebook=False)["quantized"]
         generator = torch.Generator(device=device).manual_seed(int(batch["codepoint"][0]))
         noise = torch.randn(target_latent.shape, device=device, generator=generator)
         timestep = torch.full((1,), fixed_t, device=device, dtype=torch.long)
         noisy = schedule.q_sample(target_latent, timestep, noise)
-        experts = style_encoder(refs)["experts"]
+        experts = _style_experts_from_bank(batch, style_bank, device, proxy.shape[0])
         predicted_noise = model(noisy, timestep, proxy, experts)
         predicted_start = schedule.predict_start_from_noise(noisy, timestep, predicted_noise).clamp(-4.5, 4.5)
         ink = torch.sigmoid(vq.decode(predicted_start, snap_to_codebook=True)[:, :1])
@@ -1548,6 +1681,7 @@ def train_diffusion(cfg: dict[str, Any]) -> dict[str, Any]:
     summary_path = root / "summary.json"
     device = _device(cfg)
     style_encoder, _ = load_style_encoder(cfg, device)
+    style_bank = load_style_bank(cfg, device)
     vq = load_vqvae(cfg, device)
     for parameter in style_encoder.parameters():
         parameter.requires_grad_(False)
@@ -1569,7 +1703,7 @@ def train_diffusion(cfg: dict[str, Any]) -> dict[str, Any]:
         phase_dir = root / str(phase["name"])
         previous = _train_diffusion_phase(
             cfg=cfg, phase=phase, phase_dir=phase_dir, model=model, vq=vq,
-            style_encoder=style_encoder, schedule=schedule, init_checkpoint=previous,
+            style_encoder=style_encoder, style_bank=style_bank, schedule=schedule, init_checkpoint=previous,
         )
         results.append({"name": phase["name"], "checkpoint": str(previous.resolve())})
 
@@ -1597,7 +1731,7 @@ def train_diffusion(cfg: dict[str, Any]) -> dict[str, Any]:
                 purification_results.append({"cycle": cycle, "checkpoint": str(active_checkpoint.resolve()), "reused": True})
                 continue
             hard = mine_hard_codepoints(
-                cfg, model, vq, style_encoder, schedule,
+                cfg, model, vq, style_encoder, style_bank, schedule,
                 maximum=int(purification_cfg.get("hard_samples", 8000)),
                 evaluation_size=int(purification_cfg.get("evaluation_size", 256)),
             )
@@ -1626,7 +1760,7 @@ def train_diffusion(cfg: dict[str, Any]) -> dict[str, Any]:
             }
             candidate_checkpoint = _train_diffusion_phase(
                 cfg=cfg, phase=cycle_phase, phase_dir=cycle_dir, model=model, vq=vq,
-                style_encoder=style_encoder, schedule=schedule, init_checkpoint=active_checkpoint,
+                style_encoder=style_encoder, style_bank=style_bank, schedule=schedule, init_checkpoint=active_checkpoint,
                 hard_codepoints=hard_set,
             )
             candidate_payload = torch.load(candidate_checkpoint, map_location=device, weights_only=False)
@@ -1677,6 +1811,10 @@ def train_diffusion(cfg: dict[str, Any]) -> dict[str, Any]:
 
 def load_diffusion(cfg: dict[str, Any], device: torch.device | str) -> LatentDiffusionUNet:
     path = Path(cfg["paths"]["work_dir"]) / "fusion" / "diffusion" / "diffusion_best.pt"
+    if not path.is_file():
+        raise FileNotFoundError(
+            f"Missing trained diffusion checkpoint: {path}. Run fusion training before generation."
+        )
     payload = torch.load(path, map_location=device, weights_only=False)
     model = _diffusion_model(cfg)
     if payload.get("ema"):
@@ -1811,7 +1949,7 @@ def train_fusion_refiner(cfg: dict[str, Any]) -> dict[str, Any]:
     train_loader = _loader(
         FusionRefinerDataset(
             index_path, split="train", size=phase["size"], style_size=phase["style_size"],
-            style_references=phase["style_references"], augment=True,
+            style_references=phase["style_references"], style_groups=int(style_bank.get("group_count", 12)), augment=True,
             seed=int(cfg["training"].get("seed", 20260719)) + 71,
         ),
         phase["batch_size"], workers, shuffle=True,
@@ -1819,12 +1957,12 @@ def train_fusion_refiner(cfg: dict[str, Any]) -> dict[str, Any]:
     val_loader = _loader(
         FusionRefinerDataset(
             index_path, split="val", size=phase["size"], style_size=phase["style_size"],
-            style_references=phase["style_references"], augment=False,
+            style_references=phase["style_references"], style_groups=int(style_bank.get("group_count", 12)), augment=False,
             seed=int(cfg["training"].get("seed", 20260719)) + 72,
         ),
         phase["batch_size"], workers, shuffle=False,
     )
-    criterion = FontLossFinal(ref_cfg.get("loss_weights", cfg.get("loss", {}).get("weights", {}))).to(device)
+    criterion = _efficient_glyph_criterion(ref_cfg, cfg.get("loss", {}).get("weights", {})).to(device)
     accumulation = max(1, phase["gradient_accumulation"])
     history = _read_history(root / "history.csv")
     guard = LongRunGuard(cfg)
@@ -1841,8 +1979,7 @@ def train_fusion_refiner(cfg: dict[str, Any]) -> dict[str, Any]:
             inputs = batch["input"].to(device)
             target = batch["target"].to(device)
             target_aux = batch["target_aux"].to(device)
-            refs = batch["style_refs"].to(device)
-            experts = style_encoder(refs)["experts"]
+            experts = _style_experts_from_bank(batch, style_bank, device, inputs.shape[0])
             with _autocast(device, amp):
                 prediction = evaluation_model(inputs, experts)
                 glyph_loss, _ = criterion(prediction, target, content_proxy=inputs[:, 1:], target_aux=target_aux)
@@ -1869,9 +2006,8 @@ def train_fusion_refiner(cfg: dict[str, Any]) -> dict[str, Any]:
             inputs = batch["input"].to(device)
             target = batch["target"].to(device)
             target_aux = batch["target_aux"].to(device)
-            refs = batch["style_refs"].to(device)
             with torch.no_grad():
-                experts = style_encoder(refs)["experts"]
+                experts = _style_experts_from_bank(batch, style_bank, device, inputs.shape[0])
             with _autocast(device, amp):
                 prediction = model(inputs, experts)
                 glyph_loss, _ = criterion(prediction, target, content_proxy=inputs[:, 1:], target_aux=target_aux)
@@ -1903,10 +2039,8 @@ def train_fusion_refiner(cfg: dict[str, Any]) -> dict[str, Any]:
             total += float(loss.detach().item()) * count
             seen += count
             progress.set_postfix(loss=f"{total/max(1,seen):.4f}")
-        evaluation_model = copy.deepcopy(model).to(device)
-        ema.copy_to(evaluation_model)
-        validation = evaluate(evaluation_model)
-        del evaluation_model
+        with ema.average_parameters(model):
+            validation = evaluate(model)
         scheduler.step(validation["loss"])
         improved = validation["loss"] < best
         if improved:
@@ -1935,12 +2069,10 @@ def train_fusion_refiner(cfg: dict[str, Any]) -> dict[str, Any]:
         if epoch == 1 or epoch % int(ref_cfg.get("preview_every", 4)) == 0 or improved:
             batch = next(iter(val_loader))
             inputs = batch["input"].to(device)
-            refs = batch["style_refs"].to(device)
             with torch.no_grad():
-                experts = style_encoder(refs)["experts"]
-                preview_model = copy.deepcopy(model).to(device)
-                ema.copy_to(preview_model)
-                prediction = torch.sigmoid(preview_model(inputs, experts))
+                experts = _style_experts_from_bank(batch, style_bank, device, inputs.shape[0])
+                with ema.average_parameters(model):
+                    prediction = torch.sigmoid(model(inputs, experts))
             _save_preview(
                 root / "previews" / f"epoch_{epoch:03d}.png",
                 [("corrupted candidate", inputs[:, 0].cpu().numpy()),

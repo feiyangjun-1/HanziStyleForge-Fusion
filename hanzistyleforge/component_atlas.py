@@ -228,7 +228,7 @@ def build_component_atlas(
     mean = descriptor_array.mean(axis=0)
     std = np.maximum(descriptor_array.std(axis=0), 1e-4)
     normalized = ((descriptor_array - mean) / std).astype(np.float16)
-    np.savez_compressed(
+    np.savez(
         atlas_path,
         descriptors=normalized,
         descriptor_mean=mean.astype(np.float32),

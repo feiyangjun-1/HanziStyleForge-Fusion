@@ -7,6 +7,7 @@ import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
 from .proxy import diff_visual, gray_to_ink
+from .image_cache import read_gray_u8
 from .util import atomic_save_pil, cp_label, ensure_dir
 
 
@@ -35,10 +36,9 @@ def _load_gray(path: str | Path | None, size: int) -> Image.Image:
         return _missing_image(size)
 
     try:
-        with Image.open(p) as source:
-            return source.convert("L").resize(
-                (size, size), Image.Resampling.LANCZOS
-            )
+        return Image.fromarray(read_gray_u8(p), mode="L").resize(
+            (size, size), Image.Resampling.LANCZOS
+        )
     except (OSError, PermissionError):
         # A corrupt, locked or otherwise unreadable preview must not stop the
         # automatic workflow; the audit sheet can safely show a placeholder.

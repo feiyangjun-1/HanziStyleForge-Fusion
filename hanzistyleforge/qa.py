@@ -6,6 +6,7 @@ from typing import Any
 
 from PIL import Image, ImageDraw, ImageFont
 
+from .image_cache import read_gray_u8
 from .util import atomic_save_pil, atomic_write_text, ensure_dir, load_json, read_csv, save_json, write_csv
 
 
@@ -18,8 +19,7 @@ def _load(path: str, size: int) -> Image.Image:
         draw.line((size - 8, 8, 8, size - 8), fill=180, width=2)
         return image
     try:
-        with Image.open(p) as image:
-            return image.convert("L").resize((size, size), Image.Resampling.LANCZOS)
+        return Image.fromarray(read_gray_u8(p), mode="L").resize((size, size), Image.Resampling.LANCZOS)
     except Exception:
         return Image.new("L", (size, size), 255)
 

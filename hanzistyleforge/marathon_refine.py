@@ -67,7 +67,7 @@ def _connect_database(path: Path) -> sqlite3.Connection:
     ensure_dir(path.parent)
     connection = sqlite3.connect(path, timeout=60.0)
     connection.execute("PRAGMA journal_mode=WAL")
-    connection.execute("PRAGMA synchronous=FULL")
+    connection.execute("PRAGMA synchronous=NORMAL")
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS glyph_jobs (
@@ -287,9 +287,29 @@ def _refine_one(
         if loaded_score < best_score:
             best_score, best_mask, best_details, best_label = loaded_score, loaded, loaded_details, "resumed"
 
+    skip_confidence = float(ref_cfg.get("skip_confidence", 0.985))
+    if (
+        bool(ref_cfg.get("skip_high_confidence_topology_pass", True))
+        and bool(best_details["validation"]["hard_pass"])
+        and float(row.get("chosen_confidence", 0.0) or 0.0) >= skip_confidence
+    ):
+        _atomic_save_ink(output, best_mask)
+        _save_state(
+            state_path,
+            {
+                "fingerprint": row.get("_refine_fingerprint"),
+                "stage": "done",
+                "best_score": best_score,
+                "best_label": "high_confidence_skip",
+                "topology_pass": True,
+            },
+        )
+        return best_mask, best_score, best_details, "high_confidence_skip"
+
     starts = [item[1] for item in initial]
     passes = max(1, int(ref_cfg.get("passes", 3)))
     trials = max(0, int(ref_cfg.get("global_search_trials", 220)))
+    state_interval = max(16, int(ref_cfg.get("state_save_interval_trials", 64)))
     completed_pass = int(state.get("completed_pass", -1)) if state.get("fingerprint") == row.get("_refine_fingerprint") else -1
     completed_trial = int(state.get("completed_trial", -1)) if state.get("fingerprint") == row.get("_refine_fingerprint") else -1
     for pass_index in range(passes):
@@ -309,7 +329,7 @@ def _refine_one(
             ):
                 best_score, best_mask, best_details, best_label = score, candidate, details, f"global_p{pass_index}_t{trial}"
                 _atomic_save_ink(output, best_mask)
-            if trial % 25 == 24:
+            if trial % state_interval == state_interval - 1:
                 _save_state(
                     state_path,
                     {
@@ -347,6 +367,7 @@ def _refine_one(
     resume_local = state.get("fingerprint") == row.get("_refine_fingerprint") and state.get("stage") in {"local", "done"}
     completed_sweep = int(state.get("completed_sweep", -1)) if resume_local else -1
     completed_zone = int(state.get("completed_zone", -1)) if resume_local else -1
+    local_state_interval = max(1, int(ref_cfg.get("state_save_interval_zones", 8)))
     for sweep in range(sweeps):
         if sweep < completed_sweep:
             continue
@@ -373,19 +394,20 @@ def _refine_one(
                 best_score, best_mask, best_details, best_label = local_best
                 _atomic_save_ink(output, best_mask)
                 changed = True
-            _save_state(
-                state_path,
-                {
-                    "fingerprint": row.get("_refine_fingerprint"),
-                    "completed_pass": passes - 1,
-                    "completed_trial": trials - 1,
-                    "stage": "local",
-                    "completed_sweep": sweep,
-                    "completed_zone": zone_index,
-                    "best_score": best_score,
-                    "best_label": best_label,
-                },
-            )
+            if zone_index % local_state_interval == local_state_interval - 1 or zone_index == len(zones) - 1:
+                _save_state(
+                    state_path,
+                    {
+                        "fingerprint": row.get("_refine_fingerprint"),
+                        "completed_pass": passes - 1,
+                        "completed_trial": trials - 1,
+                        "stage": "local",
+                        "completed_sweep": sweep,
+                        "completed_zone": zone_index,
+                        "best_score": best_score,
+                        "best_label": best_label,
+                    },
+                )
         if not changed:
             break
 

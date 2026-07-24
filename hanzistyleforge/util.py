@@ -127,7 +127,13 @@ def atomic_save_pil(image: Any, path: str | Path, *, format: str | None = None, 
     suffix = p.suffix or ".img"
     temp = p.with_name(p.stem + ".tmp" + suffix)
     image.save(temp, format=format, **kwargs)
-    durable_replace(temp, p)
+    if os.environ.get("HSF_DURABLE_IMAGE_WRITES", "0").strip().lower() in {"1", "true", "yes", "on"}:
+        durable_replace(temp, p)
+    else:
+        # Rendered PNGs and generated glyph candidates are reproducible cache
+        # artifacts. Atomic replacement is retained, while per-image fsync is
+        # skipped to avoid tens of thousands of synchronous disk flushes.
+        os.replace(temp, p)
 
 
 def save_json(path: str | Path, data: Any) -> None:

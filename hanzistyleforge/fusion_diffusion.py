@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import math
+from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Callable
 
@@ -106,6 +107,17 @@ class ExponentialMovingAverage:
     def copy_to(self, model: torch.nn.Module) -> None:
         model.load_state_dict(self.shadow, strict=True)
 
+    @contextmanager
+    def average_parameters(self, model: torch.nn.Module):
+        # Swap EMA weights into the existing module instead of constructing a
+        # second CUDA model for every validation and preview pass.
+        current = {name: value.detach().clone() for name, value in model.state_dict().items()}
+        self.copy_to(model)
+        try:
+            yield model
+        finally:
+            model.load_state_dict(current, strict=True)
+
 
 @torch.no_grad()
 def ddim_sample(
@@ -168,6 +180,7 @@ def classifier_free_guidance_sample(
     steps: int,
     eta: float = 0.0,
     generator: torch.Generator | None = None,
+    initial_noise: torch.Tensor | None = None,
 ) -> torch.Tensor:
     if null_style_experts is None or float(guidance_scale) == 1.0:
         return ddim_sample(
@@ -179,25 +192,31 @@ def classifier_free_guidance_sample(
             steps=steps,
             eta=eta,
             generator=generator,
+            initial_noise=initial_noise,
         )
 
     device = content_proxy.device
-    image = torch.randn(shape, device=device, generator=generator)
+    image = torch.randn(shape, device=device, generator=generator) if initial_noise is None else initial_noise.to(device)
     total = schedule.timesteps
     count = max(2, min(int(steps), total))
     times = torch.linspace(total - 1, 0, count, device=device).long()
     previous_times = torch.cat([times[1:], torch.tensor([-1], device=device, dtype=torch.long)])
+    alphas = schedule.alphas_cumprod.to(device)
     for time_value, previous_value in zip(times, previous_times):
         time = torch.full((shape[0],), int(time_value.item()), device=device, dtype=torch.long)
-        conditional = model(image, time, content_proxy, style_experts)
-        unconditional = model(image, time, content_proxy, null_style_experts)
-        predicted_noise = unconditional + float(guidance_scale) * (conditional - unconditional)
-        alpha = schedule.alphas_cumprod.to(device)[time_value]
-        alpha_previous = (
-            schedule.alphas_cumprod.to(device)[previous_value]
-            if int(previous_value.item()) >= 0
-            else torch.tensor(1.0, device=device)
+        # Conditional and unconditional predictions share the same image and
+        # content features. Running them as one doubled batch removes one full
+        # UNet launch per DDIM step.
+        doubled = model(
+            torch.cat([image, image], dim=0),
+            torch.cat([time, time], dim=0),
+            torch.cat([content_proxy, content_proxy], dim=0),
+            torch.cat([null_style_experts, style_experts], dim=0),
         )
+        unconditional, conditional = doubled.chunk(2, dim=0)
+        predicted_noise = unconditional + float(guidance_scale) * (conditional - unconditional)
+        alpha = alphas[time_value]
+        alpha_previous = alphas[previous_value] if int(previous_value.item()) >= 0 else torch.tensor(1.0, device=device)
         clean = (image - torch.sqrt(1.0 - alpha) * predicted_noise) / torch.sqrt(alpha)
         clean = clean.clamp(-4.0, 4.0)
         sigma = float(eta) * torch.sqrt(

@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 from PIL import Image
 
+from .image_cache import invalidate as invalidate_image_cache, read_gray_u8, read_rgba_u8
 from .util import atomic_save_pil
 
 
@@ -25,14 +26,14 @@ def ink_to_gray(ink: np.ndarray) -> np.ndarray:
 
 
 def read_ink(path: str | Path) -> np.ndarray:
-    with Image.open(path) as image:
-        return gray_to_ink(np.asarray(image.convert("L"), dtype=np.uint8))
+    return gray_to_ink(read_gray_u8(path))
 
 
 def save_ink(path: str | Path, ink: np.ndarray) -> None:
     p = Path(path)
     p.parent.mkdir(parents=True, exist_ok=True)
     atomic_save_pil(Image.fromarray(ink_to_gray(ink), mode="L"), p, format="PNG")
+    invalidate_image_cache(p)
 
 
 def binary(ink: np.ndarray, threshold: float = 0.5) -> np.ndarray:
@@ -325,11 +326,11 @@ def save_proxy(path: str | Path, proxy_rgba: np.ndarray) -> None:
         p,
         format="PNG",
     )
+    invalidate_image_cache(p)
 
 
 def read_proxy(path: str | Path) -> np.ndarray:
-    with Image.open(path) as image:
-        return np.asarray(image.convert("RGBA"), dtype=np.float32) / 255.0
+    return np.asarray(read_rgba_u8(path), dtype=np.float32) / 255.0
 
 
 def proxy_base_ink(proxy_rgba: np.ndarray) -> np.ndarray:

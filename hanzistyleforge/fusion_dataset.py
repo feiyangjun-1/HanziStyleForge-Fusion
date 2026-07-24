@@ -14,16 +14,13 @@ from torch.utils.data import Dataset
 
 from .dataset import _read_proxy4
 from .features import expand_proxy_channels, target_aux_from_path
+from .image_cache import read_gray_u8
 from .util import read_csv
 
 
 def read_ink_image(path: str | Path, size: int) -> np.ndarray:
-    with Image.open(path) as image:
-        gray = np.asarray(image.convert("L"), dtype=np.float32) / 255.0
-    ink = 1.0 - gray
-    if ink.shape != (int(size), int(size)):
-        ink = cv2.resize(ink, (int(size), int(size)), interpolation=cv2.INTER_AREA)
-    return ink.clip(0.0, 1.0).astype(np.float32)
+    gray = np.asarray(read_gray_u8(path, size=int(size)), dtype=np.float32) / 255.0
+    return (1.0 - gray).clip(0.0, 1.0).astype(np.float32)
 
 
 def _safe_affine(image: np.ndarray, matrix: np.ndarray) -> np.ndarray:
@@ -224,6 +221,7 @@ class FusionDiffusionDataset(Dataset):
         size: int,
         style_size: int,
         style_references: int,
+        style_groups: int = 12,
         augment: bool = False,
         hard_codepoints: set[int] | None = None,
         hard_repeat: int = 4,
@@ -238,18 +236,13 @@ class FusionDiffusionDataset(Dataset):
         self.rows = rows
         self.size = int(size)
         self.style_size = int(style_size)
-        self.style_references = int(style_references)
+        self.style_references = int(style_references)  # retained for config compatibility
+        self.style_groups = max(1, int(style_groups))
         self.augment = bool(augment)
-        self.pool = TargetStylePool(index_csv, split="train")
         self.seed = int(seed)
 
     def __len__(self) -> int:
         return len(self.rows)
-
-    def _style_refs(self, rng: random.Random, exclude_codepoint: int) -> np.ndarray:
-        paths = self.pool.sample_paths(rng, self.style_references, exclude_codepoint=exclude_codepoint)
-        glyphs = [read_ink_image(path, self.style_size) for path in paths]
-        return np.stack(glyphs, axis=0)[:, None, :, :]
 
     def __getitem__(self, index: int) -> dict[str, Any]:
         row = self.rows[index]
@@ -294,7 +287,7 @@ class FusionDiffusionDataset(Dataset):
         return {
             "proxy": torch.from_numpy(np.moveaxis(proxy.astype(np.float32), -1, 0)),
             "target_aux": torch.from_numpy(np.moveaxis(target_aux.astype(np.float32), -1, 0)),
-            "style_refs": torch.from_numpy(self._style_refs(rng, cp).astype(np.float32)),
+            "style_index": torch.tensor(rng.randrange(self.style_groups) if self.augment else index % self.style_groups, dtype=torch.long),
             "codepoint": cp,
             "complexity": torch.tensor(float(row.get("complexity", 0.0) or 0.0), dtype=torch.float32),
         }
@@ -349,7 +342,8 @@ class FusionRefinerDataset(Dataset):
         size: int,
         style_size: int,
         style_references: int,
-        augment: bool,
+        style_groups: int = 12,
+        augment: bool = False,
         seed: int = 20260719,
     ) -> None:
         self.rows = [
@@ -360,9 +354,9 @@ class FusionRefinerDataset(Dataset):
             raise RuntimeError(f"no refiner samples for split={split}")
         self.size = int(size)
         self.style_size = int(style_size)
-        self.style_references = int(style_references)
+        self.style_references = int(style_references)  # retained for config compatibility
+        self.style_groups = max(1, int(style_groups))
         self.augment = bool(augment)
-        self.pool = TargetStylePool(index_csv, split="train")
         self.seed = int(seed)
 
     def __len__(self) -> int:
@@ -376,13 +370,11 @@ class FusionRefinerDataset(Dataset):
         rng = random.Random(self.seed + index * 524287 + random.randrange(1 << 20))
         clean = target_aux[..., 0]
         candidate = corrupt_target_ink(clean, rng) if self.augment else cv2.GaussianBlur(clean, (0, 0), 0.55)
-        paths = self.pool.sample_paths(rng, self.style_references, exclude_codepoint=cp)
-        style_refs = np.stack([read_ink_image(path, self.style_size) for path in paths], axis=0)[:, None]
         model_input = np.concatenate([candidate[..., None], proxy], axis=-1)
         return {
             "input": torch.from_numpy(np.moveaxis(model_input.astype(np.float32), -1, 0)),
             "target": torch.from_numpy(clean[None].astype(np.float32)),
             "target_aux": torch.from_numpy(np.moveaxis(target_aux.astype(np.float32), -1, 0)),
-            "style_refs": torch.from_numpy(style_refs.astype(np.float32)),
+            "style_index": torch.tensor(rng.randrange(self.style_groups) if self.augment else index % self.style_groups, dtype=torch.long),
             "codepoint": cp,
         }

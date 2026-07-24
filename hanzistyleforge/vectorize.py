@@ -200,8 +200,7 @@ def image_to_ttglyph(
     y_top: float,
     config: dict[str, Any],
 ):
-    with Image.open(path) as image:
-        gray = np.asarray(image.convert("L"), dtype=np.uint8)
+    gray = np.asarray(read_gray_u8(path), dtype=np.uint8)
     ink = 1.0 - gray.astype(np.float32) / 255.0
     mode = str(config.get("outline_mode", "sdf_quadratic")).lower()
     minimum_area = float(config.get("minimum_contour_area", 2.0))
@@ -274,3 +273,4 @@ def image_to_ttglyph(
         else:
             _linear_path(pen, points)
     return pen.glyph()
+from .image_cache import read_gray_u8

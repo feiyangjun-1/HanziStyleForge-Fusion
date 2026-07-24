@@ -19,6 +19,12 @@ def configure_runtime(cfg: dict[str, Any]) -> dict[str, Any]:
     torch_threads = max(1, min(6, requested))
     opencv_threads = max(1, min(2, int(training.get("opencv_threads", 1))))
     interop_threads = max(1, min(2, int(training.get("interop_threads", 1))))
+    cache_mb = max(0, int(training.get("image_cache_mb_per_process", 192)))
+    prefetch_factor = max(2, int(training.get("prefetch_factor", 4)))
+    os.environ["HSF_IMAGE_CACHE_MB"] = str(cache_mb)
+    os.environ["HSF_PREFETCH_FACTOR"] = str(prefetch_factor)
+    durable_images = bool(cfg.get("runtime", {}).get("durable_image_writes", False))
+    os.environ["HSF_DURABLE_IMAGE_WRITES"] = "1" if durable_images else "0"
 
     # These environment variables mainly protect libraries initialised after
     # startup.  Explicit APIs below are the source of truth for this process.
@@ -38,6 +44,9 @@ def configure_runtime(cfg: dict[str, Any]) -> dict[str, Any]:
         "opencv_threads": None,
         "opencv_opencl": None,
         "windows_sleep_prevention": False,
+        "image_cache_mb_per_process": cache_mb,
+        "prefetch_factor": prefetch_factor,
+        "durable_image_writes": durable_images,
     }
 
     try:

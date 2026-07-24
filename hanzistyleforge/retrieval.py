@@ -198,7 +198,7 @@ def build_style_atlas(
     std = np.maximum(std, 1e-4)
     normalized = ((descriptor_array - mean) / std).astype(np.float32)
     residual_array = np.stack(residuals).astype(np.int8)
-    np.savez_compressed(
+    np.savez(
         atlas_path,
         descriptors=normalized.astype(np.float16),
         descriptor_mean=mean.astype(np.float32),
