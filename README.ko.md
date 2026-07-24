@@ -70,16 +70,15 @@ refs\ref.otf
 
 7. 안전 중지 요청:
 
-```text
-request_safe_stop.bat
-```
+   ```text
+   request_safe_stop.bat
+   ```
 
-재개하기 전에 중지 표시를 지웁니다.
+8. 재개하기 전에 중지 표시를 지웁니다.
 
-```text
-clear_safe_stop.bat
-run_months_resilient.bat
-```
+   ```text
+   clear_safe_stop.bat
+   ```
 
 ## 출력
 
