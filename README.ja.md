@@ -67,24 +67,17 @@ refs\ref.otf
    run_months_resilient.bat
    ```
 
-状態確認：
+7. 安全停止：
 
-```text
-run_status.bat
-```
+   ```text
+   request_safe_stop.bat
+   ```
 
-安全停止：
+8. 再開前に停止マーカーを削除します。
 
-```text
-request_safe_stop.bat
-```
-
-再開前に停止マーカーを削除します。
-
-```text
-clear_safe_stop.bat
-run_months_resilient.bat
-```
+   ```text
+   clear_safe_stop.bat
+   ```
 
 ## 出力
 
@@ -129,10 +122,6 @@ HanziStyleForge Fusion は独立実装です。以下のプロジェクトと論
 | [cjkvi/cjkvi-ids](https://github.com/cjkvi/cjkvi-ids) | Unicode IDS 部品構造と局所領域ヒント |
 
 引用は手法上の参考を示すだけであり、上流のコード、重み、データ、フォントをコピーする許可ではありません。第三者資料を使用する前に、現在のライセンスと利用条件を確認してください。
-
-## ライセンス
-
-プロジェクトコードのライセンスは [LICENSE](LICENSE) を参照してください。ユーザー提供フォント、生成フォント、第三者資料にはそれぞれの条件が適用されます。
 
 ## コントリビューション
 
