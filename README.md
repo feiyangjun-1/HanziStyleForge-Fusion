@@ -67,23 +67,16 @@ refs\ref.otf
    run_months_resilient.bat
    ```
 
-查看状态：
-
-```text
-run_status.bat
-```
-
-安全暂停：
+7. 安全暂停：
 
 ```text
 request_safe_stop.bat
 ```
 
-继续运行前清除暂停标记：
+8. 继续运行前清除暂停标记：
 
 ```text
 clear_safe_stop.bat
-run_months_resilient.bat
 ```
 
 ## 输出文件
@@ -129,10 +122,6 @@ HanziStyleForge Fusion 是独立实现。以下项目和论文为架构设计提
 | [cjkvi/cjkvi-ids](https://github.com/cjkvi/cjkvi-ids) | Unicode IDS 部件结构与局部区域提示 |
 
 引用只表示方法层面的参考，不代表获得复制上游代码、权重、数据或字体的许可。使用任何第三方材料前，请检查其当前许可证与使用条款。
-
-## 许可证
-
-项目代码许可证见 [LICENSE](LICENSE)。用户提供的字体、生成字体和第三方材料仍受各自许可证约束。
 
 ## 贡献
 
