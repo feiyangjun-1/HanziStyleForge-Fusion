@@ -22,6 +22,9 @@ class LongRunGuard:
         self.pause_above = int(thermal.get("pause_above_c", 88))
         self.resume_below = int(thermal.get("resume_below_c", 80))
         self.poll_seconds = max(5, int(thermal.get("poll_seconds", 30)))
+        self.runtime_check_interval = max(5.0, float(thermal.get("check_interval_seconds", 10.0)))
+        self._last_runtime_check = 0.0
+        self._last_disk_check = 0.0
         self.work_dir = Path(cfg["paths"]["work_dir"])
 
     def _temperature(self) -> int | None:
@@ -74,10 +77,30 @@ class LongRunGuard:
                 print("GPU temperature recovered; resuming.", flush=True)
                 return
 
+    def runtime_boundary(self) -> None:
+        """Periodically apply thermal protection between training batches.
+
+        This method intentionally does not honour the safe-stop file because a
+        durable checkpoint may not have been written yet.  It is inexpensive to
+        call every batch: nvidia-smi is launched only when the configured timer
+        expires.
+        """
+        now = time.monotonic()
+        if now - self._last_runtime_check < self.runtime_check_interval:
+            return
+        self._last_runtime_check = now
+        self._thermal_pause()
+        # Disk usage changes much more slowly than temperature.
+        if now - self._last_disk_check >= 120.0:
+            self._check_disk()
+            self._last_disk_check = now
+
     def checkpoint_boundary(self) -> None:
         """Call after an atomic checkpoint/state write, never before it."""
         self._check_disk()
+        self._last_disk_check = time.monotonic()
         self._thermal_pause()
+        self._last_runtime_check = time.monotonic()
         if self.stop_file is not None and self.stop_file.exists():
             raise SafeStopRequested(
                 f"Safe-stop file detected: {self.stop_file}. Current progress has been saved."

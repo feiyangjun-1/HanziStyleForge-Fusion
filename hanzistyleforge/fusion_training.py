@@ -87,6 +87,45 @@ def _scaler(device: torch.device, enabled: bool):
     return torch.amp.GradScaler("cuda", enabled=bool(enabled and device.type == "cuda"))
 
 
+def _is_cuda_context_error(exc: BaseException) -> bool:
+    text = str(exc).lower()
+    markers = (
+        "cuda error",
+        "cudaerrorunknown",
+        "acceleratorerror",
+        "device-side assert",
+        "illegal memory access",
+        "unspecified launch failure",
+        "driver shutting down",
+    )
+    return any(marker in text for marker in markers)
+
+
+def _write_cuda_recovery_marker(
+    phase_dir: Path,
+    *,
+    phase_name: str,
+    epoch: int,
+    step: int,
+    global_step: int,
+    exc: BaseException,
+) -> None:
+    # Do not touch CUDA here.  Once Windows resets the driver context, even a
+    # harmless tensor copy can fail.  The resilient launcher will create a new
+    # Python process and resume from the last durable checkpoint.
+    try:
+        save_json(phase_dir / "CUDA_RECOVERY.json", {
+            "stage": phase_name,
+            "epoch": int(epoch),
+            "batch": int(step),
+            "global_step": int(global_step),
+            "error": str(exc),
+            "action": "restart_process_and_resume_last_durable_checkpoint",
+        })
+    except Exception:
+        pass
+
+
 def _create_vq_optimizer(
     parameters: Iterable[torch.nn.Parameter],
     *,
@@ -886,6 +925,7 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
         history = _read_history(phase_dir / "history.csv")
         checkpoint_every = max(20, int(vq_cfg.get("checkpoint_every_steps", 240)))
         validation_batches = max(0, int(vq_cfg.get("validation_batches", 64)))
+        metric_sync_every = max(4, int(vq_cfg.get("metric_sync_every_steps", 16)))
 
         # Every VQ resolution uses significant-improvement early stopping.
         # Per-phase values override the shared defaults.
@@ -967,44 +1007,85 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
             model.train()
             optimizer.zero_grad(set_to_none=True)
             totals = 0.0
+            total_perplexity = 0.0
             seen = 0
+            metric_seen = 0
+            window_loss = torch.zeros((), device=device, dtype=torch.float32)
+            window_perplexity = torch.zeros((), device=device, dtype=torch.float32)
+            window_seen = 0
             progress = tqdm(train_loader, desc=f"{phase['name']} {epoch:03d}/{int(phase['epochs']):03d}", unit="batch")
-            for step, batch in enumerate(progress, start=1):
-                target_aux = batch["target_aux"].to(device, non_blocking=True)
-                if channels_last:
-                    target_aux = target_aux.contiguous(memory_format=torch.channels_last)
-                with _autocast(device, amp):
-                    output = model(target_aux, update_codebook=True)
-                    glyph_loss, _ = criterion(
-                        output["reconstruction"], target_aux[:, 0:1], target_aux=target_aux
+            step = 0
+            try:
+                for step, batch in enumerate(progress, start=1):
+                    target_aux = batch["target_aux"].to(device, non_blocking=True)
+                    if channels_last:
+                        target_aux = target_aux.contiguous(memory_format=torch.channels_last)
+                    with _autocast(device, amp):
+                        output = model(target_aux, update_codebook=True)
+                        glyph_loss, _ = criterion(
+                            output["reconstruction"], target_aux[:, 0:1], target_aux=target_aux
+                        )
+                        loss = glyph_loss + float(vq_cfg.get("commitment_weight", 0.25)) * output["commitment"]
+                        scaled = loss / accumulation
+                    scaler.scale(scaled).backward()
+                    if step % accumulation == 0 or step == len(train_loader):
+                        scaler.unscale_(optimizer)
+                        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                        scaler.step(optimizer)
+                        scaler.update()
+                        optimizer.zero_grad(set_to_none=True)
+                        global_step += 1
+                        if global_step % checkpoint_every == 0:
+                            _atomic_torch_save({
+                                "fingerprint": fingerprint, "model": model.state_dict(),
+                                "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(),
+                                "scaler": scaler.state_dict(), "epoch": epoch - 1, "global_step": global_step,
+                                "best": best, "no_improvement": no_improvement, "model_spec": model_spec,
+                                "significant_best": significant_best,
+                                "last_significant_epoch": last_significant_epoch,
+                                "stale_epochs": stale_epochs,
+                                "loss_profile": loss_profile, "channels_last": channels_last,
+                                "optimizer_backend": "fused" if fused_optimizer else "standard",
+                            }, phase_dir / "in_epoch.pt")
+                            guard.checkpoint_boundary()
+                    count = int(target_aux.shape[0])
+                    # Keep metrics on the GPU and synchronize only occasionally.
+                    # Per-batch .item() calls serialize the CUDA stream and made
+                    # Windows driver resets appear at tqdm formatting sites.
+                    window_loss.add_(loss.detach().float() * count)
+                    window_perplexity.add_(output["perplexity"].detach().float() * count)
+                    window_seen += count
+                    seen += count
+                    if step % metric_sync_every == 0 or step == len(train_loader):
+                        values = torch.stack((window_loss, window_perplexity)).cpu().tolist()
+                        totals += float(values[0])
+                        total_perplexity += float(values[1])
+                        metric_seen += window_seen
+                        window_loss.zero_()
+                        window_perplexity.zero_()
+                        window_seen = 0
+                        progress.set_postfix(
+                            loss=f"{totals/max(1,metric_seen):.4f}",
+                            ppl=f"{total_perplexity/max(1,metric_seen):.0f}",
+                        )
+                    guard.runtime_boundary()
+            except (RuntimeError, torch.AcceleratorError) as exc:
+                if _is_cuda_context_error(exc):
+                    _write_cuda_recovery_marker(
+                        phase_dir,
+                        phase_name=str(phase["name"]),
+                        epoch=epoch,
+                        step=step,
+                        global_step=global_step,
+                        exc=exc,
                     )
-                    loss = glyph_loss + float(vq_cfg.get("commitment_weight", 0.25)) * output["commitment"]
-                    scaled = loss / accumulation
-                scaler.scale(scaled).backward()
-                if step % accumulation == 0 or step == len(train_loader):
-                    scaler.unscale_(optimizer)
-                    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
-                    scaler.step(optimizer)
-                    scaler.update()
-                    optimizer.zero_grad(set_to_none=True)
-                    global_step += 1
-                    if global_step % checkpoint_every == 0:
-                        _atomic_torch_save({
-                            "fingerprint": fingerprint, "model": model.state_dict(),
-                            "optimizer": optimizer.state_dict(), "scheduler": scheduler.state_dict(),
-                            "scaler": scaler.state_dict(), "epoch": epoch - 1, "global_step": global_step,
-                            "best": best, "no_improvement": no_improvement, "model_spec": model_spec,
-                            "significant_best": significant_best,
-                            "last_significant_epoch": last_significant_epoch,
-                            "stale_epochs": stale_epochs,
-                            "loss_profile": loss_profile, "channels_last": channels_last,
-                            "optimizer_backend": "fused" if fused_optimizer else "standard",
-                        }, phase_dir / "in_epoch.pt")
-                        guard.checkpoint_boundary()
-                count = target_aux.shape[0]
-                totals += float(loss.detach().item()) * count
-                seen += count
-                progress.set_postfix(loss=f"{totals/max(1,seen):.4f}", ppl=f"{float(output['perplexity'].item()):.0f}")
+                    raise RuntimeError(
+                        "The CUDA driver context was reset during VQ training. "
+                        "The resilient launcher will restart the process and resume from "
+                        "the last durable checkpoint. If this repeats, reboot Windows and "
+                        "use the latest NVIDIA Studio Driver."
+                    ) from exc
+                raise
             validation = evaluate()
             scheduler.step(validation["loss"])
             improved = validation["loss"] < best
@@ -1037,7 +1118,7 @@ def train_vqvae(cfg: dict[str, Any]) -> dict[str, Any]:
                 _atomic_torch_save(payload, phase_dir / "best.pt")
             (phase_dir / "in_epoch.pt").unlink(missing_ok=True)
             history.append({
-                "epoch": epoch, "train_loss": totals / max(1, seen),
+                "epoch": epoch, "train_loss": totals / max(1, metric_seen),
                 "val_loss": validation["loss"], "val_dice": validation["dice"],
                 "val_perplexity": validation["perplexity"],
                 "learning_rate": optimizer.param_groups[0]["lr"], "best": int(improved),
