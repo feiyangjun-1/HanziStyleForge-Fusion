@@ -69,15 +69,15 @@ refs\ref.otf
 
 7. 安全暂停：
 
-```text
-request_safe_stop.bat
-```
+   ```text
+   request_safe_stop.bat
+   ```
 
 8. 继续运行前清除暂停标记：
 
-```text
-clear_safe_stop.bat
-```
+   ```text
+   clear_safe_stop.bat
+   ```
 
 ## 输出文件
 
