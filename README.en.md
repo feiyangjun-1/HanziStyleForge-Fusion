@@ -67,24 +67,17 @@ Static fonts are recommended. `target.ttf` should contain a TrueType `glyf` tabl
    run_months_resilient.bat
    ```
 
-Check status:
+7. Request a safe stop:
 
-```text
-run_status.bat
-```
+   ```text
+   request_safe_stop.bat
+   ```
 
-Request a safe stop:
+8. Clear the stop marker before resuming:
 
-```text
-request_safe_stop.bat
-```
-
-Clear the stop marker before resuming:
-
-```text
-clear_safe_stop.bat
-run_months_resilient.bat
-```
+   ```text
+   clear_safe_stop.bat
+   ```
 
 ## Outputs
 
@@ -129,10 +122,6 @@ HanziStyleForge Fusion is an independent implementation. The following projects 
 | [cjkvi/cjkvi-ids](https://github.com/cjkvi/cjkvi-ids) | Unicode IDS component structure and local-region hints |
 
 A citation indicates architectural reference only. It does not grant permission to copy upstream code, weights, data, or fonts. Check the current license and terms of every third-party artifact before use.
-
-## License
-
-See [LICENSE](LICENSE) for the project code license. User-supplied fonts, generated fonts, and third-party materials remain under their own terms.
 
 ## Contributing
 
